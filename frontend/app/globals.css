@@ -1,0 +1,297 @@
+@import "tailwindcss";
+
+/* Base Styles */
+:root {
+  color-scheme: dark;
+
+  /* ============================================
+     BACKGROUNDS - The Void
+     ============================================ */
+  --color-bg-app: #000000;
+  /* True black - reduces eye fatigue */
+  --color-bg-panel: #0A0B0D;
+  /* Near-black panel - subtle depth */
+  --color-bg-hover: #12141A;
+  /* Hover state - minimal lift */
+  --color-bg-elevated: #1A1C23;
+  /* Modal/dropdown backgrounds */
+
+  /* ============================================
+     PRIMARY ACCENT - Cyan (Action & Importance)
+     Use ONLY for: CTAs, active states, live data
+     ============================================ */
+  --color-accent-primary: #00D9E8;
+  /* Cooler cyan - less saturated */
+  --color-accent-primary-hover: #00B8CC;
+  /* Hover state */
+  --color-accent-primary-muted: #004D55;
+  /* Disabled/inactive state */
+
+  /* ============================================
+     TEXT HIERARCHY - From White to Gray
+     ============================================ */
+  --color-text-primary: #FFFFFF;
+  /* Critical data - prices, headers */
+  --color-text-secondary: #B4BCC8;
+  /* Secondary labels, metadata */
+  --color-text-tertiary: #6B7280;
+  /* Tertiary info - timestamps, IDs */
+  --color-text-disabled: #3F4449;
+  /* Disabled elements */
+
+  /* ============================================
+     P&L COLORS - Analytical, Not Emotional
+     ============================================ */
+  --color-success: #00C896;
+  /* Gains - cyan-tinted green */
+  --color-success-bg: #002820;
+  /* Success background */
+  --color-danger: #D63031;
+  /* Losses - deep red, less pink */
+  --color-danger-bg: #2A1416;
+  /* Danger background */
+
+  /* ============================================
+     BORDERS & DIVIDERS - Subtle Separation
+     ============================================ */
+  --color-border: #1F2128;
+  /* Default borders */
+  --color-border-hover: #2A2D38;
+  /* Interactive element borders */
+  --color-border-focus: #00D9E8;
+  /* Focus state (cyan) */
+
+  /* ============================================
+     LEGACY SUPPORT (Deprecated - will be removed)
+     ============================================ */
+  --color-neon-cyan: var(--color-accent-primary);
+  --color-neon-pink: #B32D36;
+  /* Darker, less saturated red */
+}
+
+/* Light Theme */
+:root.light {
+  color-scheme: light;
+
+  /* BACKGROUNDS */
+  --color-bg-app: #FFFFFF;
+  --color-bg-panel: #F7F8FA;
+  --color-bg-hover: #E8EAED;
+  --color-bg-elevated: #FFFFFF;
+
+  /* PRIMARY ACCENT */
+  --color-accent-primary: #0099AA;
+  --color-accent-primary-hover: #007A88;
+  --color-accent-primary-muted: #B3E5EA;
+
+  /* TEXT HIERARCHY */
+  --color-text-primary: #0F1419;
+  --color-text-secondary: #536471;
+  --color-text-tertiary: #8B98A5;
+  --color-text-disabled: #CFD9DE;
+
+  /* P&L COLORS */
+  --color-success: #00A878;
+  --color-success-bg: #E6F7F2;
+  --color-danger: #C23030;
+  --color-danger-bg: #FCE8E8;
+
+  /* BORDERS & DIVIDERS */
+  --color-border: #E1E8ED;
+  --color-border-hover: #C1CBD4;
+  --color-border-focus: #0099AA;
+
+  /* LEGACY SUPPORT */
+  --color-neon-cyan: var(--color-accent-primary);
+  --color-neon-pink: #C23030;
+}
+
+body {
+  background-color: var(--color-bg-app);
+  color: var(--color-text-primary);
+  font-family: var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
+  overflow-x: hidden;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Reduce motion for users who prefer it */
+@media (prefers-reduced-motion: reduce) {
+
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+/* Smooth, subtle transitions by default */
+* {
+  transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* Custom Scrollbar */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--color-bg-app);
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--color-border-hover);
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--color-border-focus);
+}
+
+/* Ticker Scroll Animation */
+@keyframes scroll {
+  0% {
+    transform: translateX(0);
+  }
+
+  100% {
+    transform: translateX(-50%);
+  }
+}
+
+.animate-scroll {
+  animation: scroll 40s linear infinite;
+}
+
+.animate-scroll:hover {
+  animation-play-state: paused;
+}
+
+/* ============================================
+   TAILWIND UTILITY CLASS MAPPINGS
+   Use these classes for consistent theming
+   ============================================ */
+
+/* Backgrounds */
+.bg-theme-app {
+  background-color: var(--color-bg-app);
+}
+
+.bg-theme-panel {
+  background-color: var(--color-bg-panel);
+}
+
+.bg-theme-hover {
+  background-color: var(--color-bg-hover);
+}
+
+.bg-theme-elevated {
+  background-color: var(--color-bg-elevated);
+}
+
+/* Accent Colors */
+.bg-theme-accent {
+  background-color: var(--color-accent-primary);
+}
+
+.bg-theme-accent-hover {
+  background-color: var(--color-accent-primary-hover);
+}
+
+.text-theme-accent {
+  color: var(--color-accent-primary);
+}
+
+.text-theme-accent-hover {
+  color: var(--color-accent-primary-hover);
+}
+
+.border-theme-accent {
+  border-color: var(--color-accent-primary);
+}
+
+/* Text Hierarchy */
+.text-theme-primary {
+  color: var(--color-text-primary);
+}
+
+.text-theme-secondary {
+  color: var(--color-text-secondary);
+}
+
+.text-theme-tertiary {
+  color: var(--color-text-tertiary);
+}
+
+.text-theme-disabled {
+  color: var(--color-text-disabled);
+}
+
+/* P&L Colors */
+.text-theme-success {
+  color: var(--color-success);
+}
+
+.text-theme-danger {
+  color: var(--color-danger);
+}
+
+.bg-theme-success {
+  background-color: var(--color-success-bg);
+}
+
+.bg-theme-danger {
+  background-color: var(--color-danger-bg);
+}
+
+/* Borders */
+.border-theme {
+  border-color: var(--color-border);
+}
+
+.border-theme-hover {
+  border-color: var(--color-border-hover);
+}
+
+.border-theme-focus {
+  border-color: var(--color-border-focus);
+}
+
+/* Legacy Compatibility (Deprecated) */
+.text-theme-neon-cyan {
+  color: var(--color-accent-primary);
+}
+
+.text-theme-neon-pink {
+  color: var(--color-danger);
+}
+
+.bg-theme-bg-panel {
+  background-color: var(--color-bg-panel);
+}
+
+.bg-theme-bg-hover {
+  background-color: var(--color-bg-hover);
+}
+
+.text-theme-text-primary {
+  color: var(--color-text-primary);
+}
+
+.text-theme-text-secondary {
+  color: var(--color-text-secondary);
+}
+
+.text-theme-text-tertiary {
+  color: var(--color-text-tertiary);
+}
+
+.border-theme-border {
+  border-color: var(--color-border);
+}
+
+.border-theme-border-hover {
+  border-color: var(--color-border-hover);
+}

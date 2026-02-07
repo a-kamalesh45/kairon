@@ -1,0 +1,23 @@
+version: '3.8'
+
+services:
+  # 1. REDIS (The Nervous System)
+  # This stores the message queues between Python and C++
+  redis:
+    image: redis:alpine
+    container_name: kairon_redis
+    ports:
+      - "6379:6379"
+    restart: always
+
+  # 2. REDIS COMMANDER (Optional - Visual UI for Redis)
+  # Allows you to see the data inside Redis in your browser
+  redis-commander:
+    image: rediscommander/redis-commander:latest
+    container_name: kairon_ui
+    environment:
+      - REDIS_HOSTS=local:redis:6379
+    ports:
+      - "8081:8081"
+    depends_on:
+      - redis
