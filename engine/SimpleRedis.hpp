@@ -45,29 +45,25 @@ public:
         send(sock, formatted.c_str(), formatted.length(), 0);
     }
 
-    // --- NEW: PUBLISH COMMAND ---
-    void publish(std::string channel, std::string message) {
-        // Redis Protocol: *3\r\n$7\r\nPUBLISH\r\n$chanLen\r\nchan\r\n$msgLen\r\nmsg\r\n
-        std::string cmd = "*3\r\n$7\r\nPUBLISH\r\n$" + 
-                          std::to_string(channel.length()) + "\r\n" + channel + "\r\n$" + 
-                          std::to_string(message.length()) + "\r\n" + message + "\r\n";
-        
-        send(sock, cmd.c_str(), cmd.length(), 0);
-        
-        // We don't wait for response to keep it fast (Fire & Forget)
-        // But we need to clear the buffer or connection might get desynced.
-        // For HFT, usually we use a separate connection for async publishing.
-        // For this demo, we'll just do a quick blocking read.
-        readResp(); 
-    }
-    // ----------------------------
-
     std::string readResp() {
         char buffer[1024];
         int bytesReceived = recv(sock, buffer, 1023, 0);
         if (bytesReceived <= 0) return "";
         buffer[bytesReceived] = '\0';
         return std::string(buffer);
+    }
+
+    // --- NEW: PUBLISH COMMAND ---
+    void publish(std::string channel, std::string message) {
+        // Redis Protocol for PUBLISH: *3\r\n$7\r\nPUBLISH\r\n$chanLen\r\nchan\r\n$msgLen\r\nmsg\r\n
+        std::string cmd = "*3\r\n$7\r\nPUBLISH\r\n$" + 
+                          std::to_string(channel.length()) + "\r\n" + channel + "\r\n$" + 
+                          std::to_string(message.length()) + "\r\n" + message + "\r\n";
+        
+        send(sock, cmd.c_str(), cmd.length(), 0);
+        
+        // Consume response to keep connection clean (Fire & Forget style)
+        readResp(); 
     }
 
     std::string consume(std::string queueName) {

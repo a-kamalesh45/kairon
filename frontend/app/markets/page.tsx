@@ -3,7 +3,6 @@
 import React, { useState } from "react"
 import Link from "next/link"
 import { Search, TrendingUp, TrendingDown, Star, Menu, Terminal, Wallet, BarChart3, Activity, ArrowUpRight, ArrowRight } from "lucide-react"
-import { ThemeToggle } from "@/components/ThemeToggle"
 import { StockTicker } from "@/components/LandingPage/Ticker"
 import { TraderProfileCard } from "@/components/TraderProfileCard"
 
@@ -50,44 +49,11 @@ export default function MarketsPage() {
                 <StockTicker />
             </div>
 
-            {/* Navigation */}
-            <nav className="fixed w-full top-12 z-40 border-b border-white/10 backdrop-blur-md bg-black/90">
-                <div className="max-w-7xl mx-auto px-6 h-16 flex items-center justify-between">
-                    <Link href="/" className="flex items-center gap-2 group cursor-pointer">
-                        <div className="relative w-8 h-8 flex items-center justify-center bg-white/5 border border-white/10 rounded overflow-hidden group-hover:border-[#00E5FF] transition-colors">
-                            <Terminal className="w-4 h-4 text-white" />
-                        </div>
-                        <span className="text-xl font-bold tracking-[0.3em] text-white">KAIRON</span>
-                    </Link>
-
-                    <div className="hidden md:flex gap-8 text-xs font-mono text-gray-400">
-                        <Link href="/" className="hover:text-[#00E5FF] transition-colors">HOME</Link>
-                        <Link href="/markets" className="text-[#00E5FF]">MARKETS</Link>
-                        <Link href="/trade" className="hover:text-[#00E5FF] transition-colors">TRADE</Link>
-                    </div>
-
-                    <div className="flex items-center gap-3">
-                        <ThemeToggle />
-                        <Link href="/trade">
-                            <button className="px-5 py-2 text-xs font-bold font-mono border border-[#00E5FF] text-black bg-[#00E5FF] hover:bg-transparent hover:text-[#00E5FF] transition-all rounded uppercase tracking-[0.15em]">
-                                Launch Terminal
-                            </button>
-                        </Link>
-                        <button
-                            onClick={() => setShowProfileCard(!showProfileCard)}
-                            className="w-8 h-8 rounded-full flex items-center justify-center text-black text-sm font-bold bg-[#00E5FF] hover:shadow-[0_0_20px_rgba(0,229,255,0.6)] transition-all duration-150 cursor-pointer"
-                        >
-                            K
-                        </button>
-                    </div>
-                </div>
-            </nav>
-
             {/* Trader Profile Card */}
             <TraderProfileCard isOpen={showProfileCard} onClose={() => setShowProfileCard(false)} />
 
             {/* 2. STATS DASHBOARD - Cards with glow on hover */}
-            <div className="pt-32 pb-8 px-6">
+            <div className="pt-8 pb-8 px-6">
                 <div className="max-w-7xl mx-auto">
                     <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
                         {/* Available Balance Card */}

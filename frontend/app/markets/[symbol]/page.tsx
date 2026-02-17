@@ -5,7 +5,6 @@ import Link from "next/link"
 import { useParams } from "next/navigation"
 import { ArrowLeft, TrendingUp, TrendingDown, Terminal, Star } from "lucide-react"
 import { createChart, ColorType } from 'lightweight-charts'
-import { ThemeToggle } from "@/components/ThemeToggle"
 
 interface CryptoInfo {
     symbol: string
@@ -136,35 +135,8 @@ export default function CryptoDetailPage() {
 
     return (
         <div className="min-h-screen" style={{ backgroundColor: 'var(--color-bg-app)', color: 'var(--color-text-primary)' }}>
-            {/* Navigation */}
-            <nav className="fixed w-full top-0 z-40 border-b border-white/5 backdrop-blur-md" style={{ backgroundColor: 'var(--color-bg-app)' + 'cc' }}>
-                <div className="max-w-7xl mx-auto px-6 h-16 flex items-center justify-between">
-                    <Link href="/" className="flex items-center gap-2 group cursor-pointer">
-                        <div className="relative w-8 h-8 flex items-center justify-center border border-white/10 rounded overflow-hidden group-hover:border-(--color-neon-cyan) transition-colors" style={{ backgroundColor: 'var(--color-bg-panel)' }}>
-                            <Terminal className="w-4 h-4" style={{ color: 'var(--color-text-primary)' }} />
-                        </div>
-                        <span className="text-xl font-bold tracking-widest" style={{ color: 'var(--color-text-primary)' }}>KAIRON</span>
-                    </Link>
-
-                    <div className="hidden md:flex gap-8 text-xs font-mono" style={{ color: 'var(--color-text-secondary)' }}>
-                        <Link href="/" className="hover:text-(--color-neon-cyan) transition-colors">HOME</Link>
-                        <Link href="/markets" className="hover:text-(--color-neon-cyan) transition-colors">MARKETS</Link>
-                        <Link href="/trade" className="hover:text-(--color-neon-cyan) transition-colors">TRADE</Link>
-                    </div>
-
-                    <div className="flex items-center gap-3">
-                        <ThemeToggle />
-                        <Link href="/trade">
-                            <button className="px-5 py-2 text-xs font-bold font-mono border rounded uppercase tracking-wider transition-all" style={{ borderColor: 'var(--color-neon-cyan)', color: 'var(--color-text-primary)', backgroundColor: 'var(--color-neon-cyan)' }}>
-                                Launch Terminal
-                            </button>
-                        </Link>
-                    </div>
-                </div>
-            </nav>
-
             {/* Main Content */}
-            <main className="pt-24 pb-20 px-6">
+            <main className="pt-8 pb-20 px-6">
                 <div className="max-w-7xl mx-auto">
                     {/* Back Button */}
                     <Link href="/markets" className="inline-flex items-center gap-2 mb-6 font-mono text-sm hover:text-(--color-neon-cyan) transition-colors" style={{ color: 'var(--color-text-secondary)' }}>

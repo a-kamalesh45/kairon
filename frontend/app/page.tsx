@@ -7,7 +7,6 @@ import { ArrowRight, Shield, Cpu, Activity, Terminal, Network, Database, Code2, 
 
 // Import your components
 import { StockTicker } from "@/components/LandingPage/Ticker"
-import { ThemeToggle } from "@/components/ThemeToggle"
 
 // 2. Load the Globe ONLY on the client (Browser)
 // This fixes "window is not defined" because the server ignores this file.
@@ -24,38 +23,8 @@ export default function LandingPage() {
         <StockTicker />
       </div>
 
-      {/* 2. NAVIGATION */}
-      <nav className="fixed w-full top-12 z-40 border-b border-theme-border backdrop-blur-md" style={{ backgroundColor: 'var(--color-bg-app)' + 'cc' }}>
-        <div className="max-w-7xl mx-auto px-6 h-16 flex items-center justify-between">
-          {/* Logo */}
-          <div className="flex items-center gap-2 group cursor-pointer">
-            <div className="relative w-8 h-8 flex items-center justify-center bg-theme-bg-panel border border-theme-border rounded overflow-hidden group-hover:border-theme-border-hover transition-colors">
-              <Terminal className="w-4 h-4 text-theme-text-primary" />
-            </div>
-            <span className="text-xl font-bold tracking-widest text-theme-text-primary">KAIRON</span>
-          </div>
-
-          {/* Links */}
-          <div className="hidden md:flex gap-8 text-xs font-mono text-theme-text-secondary">
-            <Link href="/" className="hover:text-theme-neon-cyan transition-colors">HOME</Link>
-            <Link href="/markets" className="hover:text-theme-neon-cyan transition-colors">MARKETS</Link>
-            <Link href="/trade" className="hover:text-theme-neon-cyan transition-colors">TRADE</Link>
-          </div>
-
-          {/* CTA & Theme Toggle */}
-          <div className="flex items-center gap-3">
-            <ThemeToggle />
-            <Link href="/trade">
-              <button className="px-5 py-2 text-xs font-bold font-mono border border-theme-neon-cyan text-theme-text-primary transition-all rounded uppercase tracking-wider" style={{ backgroundColor: 'var(--color-neon-cyan)' }}>
-                Launch Terminal
-              </button>
-            </Link>
-          </div>
-        </div>
-      </nav>
-
-      {/* 3. HERO SECTION */}
-      <main className="relative pt-28 pb-16 px-6 min-h-screen flex items-center">
+      {/* 2. HERO SECTION */}
+      <main className="relative pt-16 pb-16 px-6 min-h-screen flex items-center">
 
         <div className="max-w-7xl mx-auto w-full grid grid-cols-1 lg:grid-cols-2 gap-16 items-center">
 
@@ -127,7 +96,7 @@ export default function LandingPage() {
             <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-100 h-100 bg-theme-accent opacity-[0.02] blur-[100px] rounded-full pointer-events-none"></div>
 
             {/* Globe with enhanced visibility */}
-            <div className="relative w-[650px] h-[650px] opacity-70 lg:-mr-32" style={{
+            <div className="relative w-162.5 h-162.5 opacity-70 lg:-mr-32" style={{
               filter: 'contrast(1.2) brightness(1.1)',
             }}>
               <Globe />

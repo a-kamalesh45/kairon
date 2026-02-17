@@ -1,10 +1,22 @@
 #include "OrderBook.hpp"
 #include <iostream>
 #include <algorithm>
+#include <sstream>
+#include <ctime>
+#include <iomanip>
 
-void OrderBook::addOrder(Order order)
+// Helper: Get current time as HH:MM:SS string
+std::string get_time_str() {
+    std::time_t t = std::time(nullptr);
+    std::tm* now = std::localtime(&t);
+    std::stringstream ss;
+    ss << std::put_time(now, "%H:%M:%S");
+    return ss.str();
+}
+
+void OrderBook::addOrder(Order order, std::string symbol)
 {
-    matchOrders(order);
+    matchOrders(order, symbol);
 
     if (order.quantity > 0)
     {
@@ -19,10 +31,11 @@ void OrderBook::addOrder(Order order)
     }
 }
 
-void OrderBook::matchOrders(Order &incomingOrder)
+void OrderBook::matchOrders(Order &incomingOrder, std::string symbol)
 {
-    // === BUY LOGIC ===
-    if (incomingOrder.type) // If incoming is BUY
+    bool isBuy = incomingOrder.type;
+
+    if (isBuy) // BUY LOGIC
     {
         while (incomingOrder.quantity > 0 && !asks.empty() && asks.begin()->first <= incomingOrder.price)
         {
@@ -33,23 +46,30 @@ void OrderBook::matchOrders(Order &incomingOrder)
 
             ll tradeQty = std::min(incomingOrder.quantity, bookOrder.quantity);
             
-            // === CRITICAL FIX: Update Last Traded Price ===
+            // Update Last Traded Price
             lastTradedPrice = bestPrice;
-            // ==============================================
+
+            // === GENERATE TRADE EVENT (JSON) ===
+            // We divide by 10000.0 to convert back to float for the UI
+            std::stringstream json;
+            json << "{\"type\":\"trade\","
+                 << "\"symbol\":\"" << symbol << "\","
+                 << "\"price\":" << (bestPrice / 10000.0) << ","
+                 << "\"qty\":" << (tradeQty / 10000.0) << ","
+                 << "\"side\":\"buy\","
+                 << "\"time\":\"" << get_time_str() << "\"}";
+            
+            pendingTrades.push_back(json.str());
+            // ===================================
 
             incomingOrder.quantity -= tradeQty;
             bookOrder.quantity -= tradeQty;
 
-            if (bookOrder.quantity == 0) {
-                ordersAtPrice.pop_front();
-            }
-            if (ordersAtPrice.empty()) {
-                asks.erase(bestAskIt);
-            }
+            if (bookOrder.quantity == 0) ordersAtPrice.pop_front();
+            if (ordersAtPrice.empty()) asks.erase(bestAskIt);
         }
     }
-    // === SELL LOGIC ===
-    else // If incoming is SELL
+    else // SELL LOGIC
     {
         while (incomingOrder.quantity > 0 && !bids.empty() && bids.begin()->first >= incomingOrder.price)
         {
@@ -59,10 +79,20 @@ void OrderBook::matchOrders(Order &incomingOrder)
             Order& bookOrder = ordersAtPrice.front();
 
             ll tradeQty = std::min(incomingOrder.quantity, bookOrder.quantity);
-
-            // === CRITICAL FIX: Update Last Traded Price ===
+            
             lastTradedPrice = bestPrice;
-            // ==============================================
+
+            // === GENERATE TRADE EVENT (JSON) ===
+            std::stringstream json;
+            json << "{\"type\":\"trade\","
+                 << "\"symbol\":\"" << symbol << "\","
+                 << "\"price\":" << (bestPrice / 10000.0) << ","
+                 << "\"qty\":" << (tradeQty / 10000.0) << ","
+                 << "\"side\":\"sell\","
+                 << "\"time\":\"" << get_time_str() << "\"}";
+            
+            pendingTrades.push_back(json.str());
+            // ===================================
 
             incomingOrder.quantity -= tradeQty;
             bookOrder.quantity -= tradeQty;
@@ -75,23 +105,14 @@ void OrderBook::matchOrders(Order &incomingOrder)
 
 Ticker OrderBook::getTicker() {
     Ticker ticker = {};
-    
-    // 1. Get Best Prices
     ticker.bestBid = (!bids.empty()) ? bids.begin()->first : 0;
     ticker.bestAsk = (!asks.empty()) ? asks.begin()->first : 0;
-
-    // 2. Calculate Mid Price & Spread
-    // Note: Since we use integers, (100 + 101)/2 becomes 100. This is standard for ints.
+    
     if (ticker.bestBid > 0 && ticker.bestAsk > 0) {
         ticker.midPrice = (ticker.bestBid + ticker.bestAsk) / 2;
         ticker.spread = ticker.bestAsk - ticker.bestBid;
-    } else {
-        ticker.midPrice = 0;
-        ticker.spread = 0;
     }
-
-    // 3. Return the REAL Last Traded Price (Fixed)
+    
     ticker.lastPrice = lastTradedPrice; 
-
     return ticker;
 }

@@ -1,6 +1,6 @@
 "use client"
 
-import React, { useState, useEffect, useRef } from "react"
+import React, { useState, useEffect, useRef, useMemo } from "react"
 import Link from "next/link"
 import {
     Wifi, Zap, ChevronDown, TrendingUp, TrendingDown, Sun, Moon, Search, Star,
@@ -78,6 +78,12 @@ export default function TradeTerminal() {
     const [orderPrice, setOrderPrice] = useState<string>("")
     const [orderType, setOrderType] = useState<'limit' | 'market'>('limit')
 
+    // Open Orders & History
+    const [ordersTab, setOrdersTab] = useState<'OPEN' | 'HISTORY'>('OPEN')
+    const [openOrders, setOpenOrders] = useState<any[]>([])
+    const [orderHistory, setOrderHistory] = useState<any[]>([])
+    const [loadingOrders, setLoadingOrders] = useState(true)
+
     const chartContainerRef = useRef<HTMLDivElement>(null);
     const chartRef = useRef<IChartApi | null>(null);
     const candleSeriesRef = useRef<any>(null);
@@ -88,6 +94,13 @@ export default function TradeTerminal() {
     useEffect(() => {
         setMounted(true)
     }, [])
+
+    // Save last visited symbol to localStorage
+    useEffect(() => {
+        if (selectedCrypto) {
+            localStorage.setItem('last_trade_symbol', selectedCrypto.symbol + 'USDT')
+        }
+    }, [selectedCrypto])
 
     const toggleFavorite = (symbol: string) => {
         setFavorites(prev => {
@@ -146,27 +159,58 @@ export default function TradeTerminal() {
 
         chartRef.current = chart;
         candleSeriesRef.current = candleSeries;
+        // --- ADD THIS NEW BLOCK ---
+        const fetchHistory = async () => {
+            try {
+                // Call our new API route
+                const res = await fetch(`/api/history?symbol=${selectedCrypto.symbol}`);
+                const data = await res.json();
 
-        const initialData = [];
-        let price = selectedCrypto.price;
-        let time = Math.floor(Date.now() / 1000) - 6000;
+                if (Array.isArray(data) && data.length > 0) {
+                    candleSeries.setData(data);
 
-        for (let i = 0; i < 100; i++) {
-            const open = price;
-            const volatility = price * 0.001;
-            const close = price + (Math.random() * volatility * 2 - volatility);
-            const high = Math.max(open, close) + Math.random() * volatility * 0.5;
-            const low = Math.min(open, close) - Math.random() * volatility * 0.5;
+                    // Sync the "Current Candle" ref so live updates attach smoothly
+                    const lastCandle = data[data.length - 1];
+                    currentCandle.current = {
+                        time: lastCandle.time + 60, // Prepare for the NEXT minute
+                        open: lastCandle.close,
+                        high: lastCandle.close,
+                        low: lastCandle.close,
+                        close: lastCandle.close
+                    };
 
-            initialData.push({ time: time as any, open, high, low, close });
-            time += 60;
-            price = close;
-        }
+                    // Optional: Update the header price to the latest historical close
+                    setCurrentPrice(lastCandle.close);
+                    setLastPrice(lastCandle.open);
+                }
+            } catch (e) {
+                console.error("Failed to load history", e);
+            }
+        };
 
-        candleSeries.setData(initialData);
+        fetchHistory();
+        // ---------------------------
 
-        const last = initialData[initialData.length - 1];
-        currentCandle.current = { ...last, time: (last.time + 60) as any, open: last.close, high: last.close, low: last.close, close: last.close };
+        // const initialData = [];
+        // let price = selectedCrypto.price;
+        // let time = Math.floor(Date.now() / 1000) - 6000;
+
+        // for (let i = 0; i < 100; i++) {
+        //     const open = price;
+        //     const volatility = price * 0.001;
+        //     const close = price + (Math.random() * volatility * 2 - volatility);
+        //     const high = Math.max(open, close) + Math.random() * volatility * 0.5;
+        //     const low = Math.min(open, close) - Math.random() * volatility * 0.5;
+
+        //     initialData.push({ time: time as any, open, high, low, close });
+        //     time += 60;
+        //     price = close;
+        // }
+
+        // candleSeries.setData(initialData);
+
+        // const last = initialData[initialData.length - 1];
+        // currentCandle.current = { ...last, time: (last.time + 60) as any, open: last.close, high: last.close, low: last.close, close: last.close };
 
         const handleResize = () => {
             if (chartContainerRef.current) {
@@ -272,6 +316,94 @@ export default function TradeTerminal() {
         return price.toFixed(4);
     }
 
+    // Load open orders
+    const loadOpenOrders = async () => {
+        try {
+            const token = localStorage.getItem('kairon_token')
+            const res = await fetch(`/api/orders/open?symbol=${selectedCrypto.symbol}USD`, {
+                headers: {
+                    'Authorization': `Bearer ${token}`,
+                    'Content-Type': 'application/json'
+                }
+            })
+            if (res.ok) {
+                const data = await res.json()
+                setOpenOrders(data.orders)
+            }
+        } catch (error) {
+            console.error('Failed to load open orders:', error)
+        }
+    }
+
+    // Load order history
+    const loadOrderHistory = async () => {
+        try {
+            const token = localStorage.getItem('kairon_token')
+            const res = await fetch(`/api/orders/history?symbol=${selectedCrypto.symbol}USD`, {
+                headers: {
+                    'Authorization': `Bearer ${token}`,
+                    'Content-Type': 'application/json'
+                }
+            })
+            if (res.ok) {
+                const data = await res.json()
+                setOrderHistory(data.orders)
+            }
+        } catch (error) {
+            console.error('Failed to load order history:', error)
+        } finally {
+            setLoadingOrders(false)
+        }
+    }
+
+    // Cancel order
+    const cancelOrder = async (orderId: string) => {
+        try {
+            const token = localStorage.getItem('kairon_token')
+            const res = await fetch('/api/orders/cancel', {
+                method: 'POST',
+                headers: {
+                    'Authorization': `Bearer ${token}`,
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ orderId })
+            })
+            if (res.ok) {
+                setOpenOrders(prev => prev.filter(o => o.id !== orderId))
+            }
+        } catch (error) {
+            console.error('Failed to cancel order:', error)
+        }
+    }
+
+    // Calculate cumulative depth
+    const calculateDepth = useMemo(() => {
+        const sortedBids = [...bids].sort((a, b) => b.price - a.price)
+        const sortedAsks = [...asks].sort((a, b) => a.price - b.price)
+
+        let cumulativeBids = []
+        let cumulative = 0
+        for (const bid of sortedBids) {
+            cumulative += bid.qty
+            cumulativeBids.push({ price: bid.price, cumulative })
+        }
+
+        let cumulativeAsks = []
+        cumulative = 0
+        for (const ask of sortedAsks) {
+            cumulative += ask.qty
+            cumulativeAsks.push({ price: ask.price, cumulative })
+        }
+
+        return { bids: cumulativeBids, asks: cumulativeAsks }
+    }, [bids, asks])
+
+    // Load orders on symbol change
+    useEffect(() => {
+        loadOpenOrders()
+        loadOrderHistory()
+    }, [selectedCrypto])
+
     const t = {
         bg: theme === 'dark' ? 'bg-[#0d1117]' : 'bg-white',
         bgSecondary: theme === 'dark' ? 'bg-[#161b22]' : 'bg-gray-50',
@@ -290,49 +422,6 @@ export default function TradeTerminal() {
 
     return (
         <div className="h-screen w-screen flex flex-col overflow-hidden bg-black text-white">
-            {/* Top Navigation Bar */}
-            <nav className="h-16 border-b border-white/10 backdrop-blur-md bg-black/90 flex items-center justify-between px-6 shrink-0">
-                <div className="flex items-center gap-6">
-                    <Link href="/" className="flex items-center gap-2 group cursor-pointer">
-                        <div className="relative w-8 h-8 flex items-center justify-center bg-white/5 border border-white/10 rounded overflow-hidden group-hover:border-[#00E5FF] transition-colors duration-150">
-                            <Terminal className="w-4 h-4 text-white" />
-                        </div>
-                        <span className="text-xl font-bold tracking-[0.3em] text-white">KAIRON</span>
-                    </Link>
-
-                    <div className="hidden md:flex gap-8 text-xs font-mono text-gray-400">
-                        <Link href="/" className="hover:text-[#00E5FF] transition-colors duration-150">HOME</Link>
-                        <Link href="/markets" className="hover:text-[#00E5FF] transition-colors duration-150">MARKETS</Link>
-                        <Link href="/trade" className="text-[#00E5FF]">TRADE</Link>
-                    </div>
-                </div>
-
-                <div className="flex items-center gap-3">
-                    <div className={`hidden md:flex items-center gap-2 px-3 py-1.5 rounded text-xs font-mono border uppercase tracking-widest ${connectionStatus === 'connected' ? 'border-[#00E5FF]/50 text-[#00E5FF] bg-[#00E5FF]/10' : 'border-red-500/50 text-red-500 bg-red-500/10 animate-pulse'}`}>
-                        ● {connectionStatus === 'connected' ? 'SYSTEM LIVE' : 'DISCONNECTED'}
-                    </div>
-
-                    <button className="p-2 hover:bg-white/5 rounded transition-all duration-150" onClick={toggleTheme}>
-                        {theme === 'dark' ? <Sun className="w-5 h-5 text-gray-500" /> : <Moon className="w-5 h-5 text-gray-500" />}
-                    </button>
-
-                    <button className="p-2 hover:bg-white/5 rounded transition-all duration-150">
-                        <Bell className="w-5 h-5 text-gray-500" />
-                    </button>
-
-                    <button className="p-2 hover:bg-white/5 rounded transition-all duration-150">
-                        <Wallet className="w-5 h-5 text-gray-500" />
-                    </button>
-
-                    <button
-                        onClick={() => setShowProfileCard(!showProfileCard)}
-                        className="w-8 h-8 rounded-full flex items-center justify-center text-black text-sm font-bold bg-[#00E5FF] hover:shadow-[0_0_20px_rgba(0,229,255,0.6)] transition-all duration-150 cursor-pointer"
-                    >
-                        K
-                    </button>
-                </div>
-            </nav>
-
             {/* Trader Profile Card */}
             <TraderProfileCard isOpen={showProfileCard} onClose={() => setShowProfileCard(false)} />
 
@@ -472,6 +561,58 @@ export default function TradeTerminal() {
                         <div className="absolute inset-0 pointer-events-none" style={{
                             backgroundImage: 'repeating-linear-gradient(0deg, transparent, transparent 2px, rgba(255,255,255,0.02) 2px, rgba(255,255,255,0.02) 4px)'
                         }} />
+                    </div>
+
+                    {/* Depth Chart */}
+                    <div className="h-48 shrink-0 border-t border-white/10 bg-black/50">
+                        <div className="px-4 py-2 border-b border-white/10">
+                            <span className="text-xs font-mono text-gray-500 tracking-wider uppercase">// MARKET DEPTH</span>
+                        </div>
+                        <div className="h-full p-4">
+                            <svg className="w-full h-full" viewBox="0 0 800 120" preserveAspectRatio="none">
+                                {/* Bid Area (Left - Cyan) */}
+                                {calculateDepth.bids.length > 0 && (
+                                    <path
+                                        d={`M 0 120 ${calculateDepth.bids.map((d: { price: number, cumulative: number }, i: number) => {
+                                            const x = (i / calculateDepth.bids.length) * 400
+                                            const y = 120 - (d.cumulative / Math.max(...calculateDepth.bids.map((b: { price: number, cumulative: number }) => b.cumulative)) * 100)
+                                            return `L ${x} ${y}`
+                                        }).join(' ')} L 400 120 Z`}
+                                        fill="url(#bidGradient)"
+                                        stroke="#00E5FF"
+                                        strokeWidth="1.5"
+                                        opacity="0.8"
+                                    />
+                                )}
+                                {/* Ask Area (Right - Pink) */}
+                                {calculateDepth.asks.length > 0 && (
+                                    <path
+                                        d={`M 400 120 ${calculateDepth.asks.map((d: { price: number, cumulative: number }, i: number) => {
+                                            const x = 400 + (i / calculateDepth.asks.length) * 400
+                                            const y = 120 - (d.cumulative / Math.max(...calculateDepth.asks.map((a: { price: number, cumulative: number }) => a.cumulative)) * 100)
+                                            return `L ${x} ${y}`
+                                        }).join(' ')} L 800 120 Z`}
+                                        fill="url(#askGradient)"
+                                        stroke="#FF006E"
+                                        strokeWidth="1.5"
+                                        opacity="0.8"
+                                    />
+                                )}
+                                {/* Center Line */}
+                                <line x1="400" y1="0" x2="400" y2="120" stroke="white" strokeWidth="1" opacity="0.2" strokeDasharray="2,2" />
+                                {/* Gradients */}
+                                <defs>
+                                    <linearGradient id="bidGradient" x1="0" y1="0" x2="0" y2="1">
+                                        <stop offset="0%" stopColor="#00E5FF" stopOpacity="0.4" />
+                                        <stop offset="100%" stopColor="#00E5FF" stopOpacity="0.05" />
+                                    </linearGradient>
+                                    <linearGradient id="askGradient" x1="0" y1="0" x2="0" y2="1">
+                                        <stop offset="0%" stopColor="#FF006E" stopOpacity="0.4" />
+                                        <stop offset="100%" stopColor="#FF006E" stopOpacity="0.05" />
+                                    </linearGradient>
+                                </defs>
+                            </svg>
+                        </div>
                     </div>
 
                     {/* 4. PLACE ORDER - Bottom Left */}
@@ -616,6 +757,162 @@ export default function TradeTerminal() {
                             ))}
                         </div>
                     </div>
+                </div>
+            </div>
+
+            {/* Open Orders & History Tabs */}
+            <div className="border-t border-white/10 bg-[#0A0B0D]">
+                {/* Tab Headers */}
+                <div className="flex gap-0 border-b border-white/10 px-6">
+                    <button
+                        onClick={() => setOrdersTab('OPEN')}
+                        className={`px-6 py-3 text-xs font-mono uppercase tracking-widest transition-all duration-200 ${ordersTab === 'OPEN'
+                                ? 'text-[#00E5FF] border-b-2 border-[#00E5FF]'
+                                : 'text-gray-600 hover:text-gray-400'
+                            }`}
+                    >
+                        Open Orders
+                    </button>
+                    <button
+                        onClick={() => setOrdersTab('HISTORY')}
+                        className={`px-6 py-3 text-xs font-mono uppercase tracking-widest transition-all duration-200 ${ordersTab === 'HISTORY'
+                                ? 'text-[#00E5FF] border-b-2 border-[#00E5FF]'
+                                : 'text-gray-600 hover:text-gray-400'
+                            }`}
+                    >
+                        Order History
+                    </button>
+                </div>
+
+                {/* Tab Content */}
+                <div className="p-6">
+                    {ordersTab === 'OPEN' ? (
+                        // Open Orders Table
+                        loadingOrders ? (
+                            <div className="text-center py-8 text-gray-600 font-mono text-sm">
+                                Loading orders...
+                            </div>
+                        ) : openOrders.length === 0 ? (
+                            <div className="text-center py-12 text-gray-600 font-mono uppercase tracking-widest text-sm">
+                                NO ACTIVE ORDERS
+                            </div>
+                        ) : (
+                            <div className="overflow-x-auto">
+                                <table className="w-full font-mono text-sm">
+                                    <thead>
+                                        <tr className="border-b border-white/10">
+                                            <th className="text-left py-3 px-4 text-xs text-gray-500 uppercase tracking-widest">Order ID</th>
+                                            <th className="text-center py-3 px-4 text-xs text-gray-500 uppercase tracking-widest">Side</th>
+                                            <th className="text-right py-3 px-4 text-xs text-gray-500 uppercase tracking-widest">Price</th>
+                                            <th className="text-right py-3 px-4 text-xs text-gray-500 uppercase tracking-widest">Quantity</th>
+                                            <th className="text-right py-3 px-4 text-xs text-gray-500 uppercase tracking-widest">Filled</th>
+                                            <th className="text-left py-3 px-4 text-xs text-gray-500 uppercase tracking-widest">Timestamp</th>
+                                            <th className="text-center py-3 px-4 text-xs text-gray-500 uppercase tracking-widest">Action</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {openOrders.map((order) => (
+                                            <tr
+                                                key={order.id}
+                                                className="border-b border-white/5 hover:bg-white/5 transition-colors"
+                                            >
+                                                <td className="py-4 px-4 text-gray-400">
+                                                    {order.id.substring(0, 8)}...
+                                                </td>
+                                                <td className="py-4 px-4 text-center">
+                                                    <span className={`inline-block px-3 py-1 text-xs font-bold uppercase tracking-widest -skew-x-6 ${order.side === 'buy'
+                                                            ? 'text-[#00E5FF] border border-[#00E5FF]/30 bg-[#00E5FF]/10'
+                                                            : 'text-[#FF006E] border border-[#FF006E]/30 bg-[#FF006E]/10'
+                                                        }`}>
+                                                        <span className="skew-x-6">{order.side}</span>
+                                                    </span>
+                                                </td>
+                                                <td className="py-4 px-4 text-right text-white">
+                                                    ${order.price.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                                </td>
+                                                <td className="py-4 px-4 text-right text-gray-400">
+                                                    {order.quantity.toFixed(4)}
+                                                </td>
+                                                <td className="py-4 px-4 text-right text-gray-400">
+                                                    {order.filled.toFixed(1)}%
+                                                </td>
+                                                <td className="py-4 px-4 text-gray-400">
+                                                    {new Date(order.timestamp).toLocaleString()}
+                                                </td>
+                                                <td className="py-4 px-4 text-center">
+                                                    <button
+                                                        onClick={() => cancelOrder(order.id)}
+                                                        className="py-1 px-3 border border-[#FF006E] text-[#FF006E] hover:bg-[#FF006E] hover:text-black font-bold font-mono uppercase tracking-widest text-xs -skew-x-6 hover:shadow-[0_0_15px_rgba(255,0,110,0.4)] transition-all duration-150"
+                                                    >
+                                                        <span className="skew-x-6 block">CANCEL</span>
+                                                    </button>
+                                                </td>
+                                            </tr>
+                                        ))}
+                                    </tbody>
+                                </table>
+                            </div>
+                        )
+                    ) : (
+                        // Order History Table
+                        loadingOrders ? (
+                            <div className="text-center py-8 text-gray-600 font-mono text-sm">
+                                Loading history...
+                            </div>
+                        ) : orderHistory.length === 0 ? (
+                            <div className="text-center py-12 text-gray-600 font-mono uppercase tracking-widest text-sm">
+                                NO ORDER HISTORY
+                            </div>
+                        ) : (
+                            <div className="overflow-x-auto">
+                                <table className="w-full font-mono text-sm">
+                                    <thead>
+                                        <tr className="border-b border-white/10">
+                                            <th className="text-left py-3 px-4 text-xs text-gray-500 uppercase tracking-widest">Timestamp</th>
+                                            <th className="text-center py-3 px-4 text-xs text-gray-500 uppercase tracking-widest">Side</th>
+                                            <th className="text-right py-3 px-4 text-xs text-gray-500 uppercase tracking-widest">Price</th>
+                                            <th className="text-right py-3 px-4 text-xs text-gray-500 uppercase tracking-widest">Quantity</th>
+                                            <th className="text-right py-3 px-4 text-xs text-gray-500 uppercase tracking-widest">Fee</th>
+                                            <th className="text-right py-3 px-4 text-xs text-gray-500 uppercase tracking-widest">Realized PnL</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {orderHistory.map((order) => (
+                                            <tr
+                                                key={order.id}
+                                                className="border-b border-white/5 hover:bg-white/5 transition-colors"
+                                            >
+                                                <td className="py-4 px-4 text-gray-400">
+                                                    {new Date(order.timestamp).toLocaleString()}
+                                                </td>
+                                                <td className="py-4 px-4 text-center">
+                                                    <span className={`inline-block px-3 py-1 text-xs font-bold uppercase tracking-widest -skew-x-6 ${order.side === 'buy'
+                                                            ? 'text-[#00E5FF] border border-[#00E5FF]/30 bg-[#00E5FF]/10'
+                                                            : 'text-[#FF006E] border border-[#FF006E]/30 bg-[#FF006E]/10'
+                                                        }`}>
+                                                        <span className="skew-x-6">{order.side}</span>
+                                                    </span>
+                                                </td>
+                                                <td className="py-4 px-4 text-right text-white">
+                                                    ${order.price.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                                </td>
+                                                <td className="py-4 px-4 text-right text-gray-400">
+                                                    {order.quantity.toFixed(4)}
+                                                </td>
+                                                <td className="py-4 px-4 text-right text-gray-500">
+                                                    ${order.fee.toFixed(2)}
+                                                </td>
+                                                <td className={`py-4 px-4 text-right font-bold ${order.realizedPnL >= 0 ? 'text-[#00E5FF]' : 'text-[#FF006E]'
+                                                    }`}>
+                                                    {order.realizedPnL >= 0 ? '+' : ''}${Math.abs(order.realizedPnL).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                                </td>
+                                            </tr>
+                                        ))}
+                                    </tbody>
+                                </table>
+                            </div>
+                        )
+                    )}
                 </div>
             </div>
         </div>
