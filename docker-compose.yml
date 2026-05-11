@@ -1,8 +1,6 @@
-version: '3.8'
-
 services:
   # 1. REDIS (The Nervous System)
-  # This stores the message queues between Python and C++
+  # This stores the message queues between Node.js and C++
   redis:
     image: redis:alpine
     container_name: kairon_redis

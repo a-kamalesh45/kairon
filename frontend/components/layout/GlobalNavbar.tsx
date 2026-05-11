@@ -8,6 +8,7 @@ import {
     Sun, Moon
 } from 'lucide-react'
 import { useTheme } from '@/components/ThemeProvider'
+import { useAuth } from '@/context/AuthContext'
 
 interface NavbarProps {
     className?: string
@@ -87,6 +88,7 @@ function LeftNav() {
 
 function RightNav() {
     const { theme, toggleTheme } = useTheme()
+    const { user, logout } = useAuth()
     const [showProfile, setShowProfile] = useState(false)
 
     return (
@@ -136,17 +138,54 @@ function RightNav() {
                 <Settings size={18} />
             </Link>
 
-            {/* Profile */}
-            <button
-                onClick={() => setShowProfile(true)}
-                className="p-2 hover:bg-white/5 rounded transition-colors"
-                aria-label="Profile"
-            >
-                <User size={18} />
-            </button>
+            {!user ? (
+                <div className="flex items-center gap-2">
+                    <Link
+                        href="/auth/login"
+                        className="px-4 py-2 border border-white/10 text-xs font-mono uppercase text-white hover:text-[#00E5FF] hover:border-[#00E5FF]/50 transition-colors"
+                    >
+                        Login
+                    </Link>
+                    <Link
+                        href="/auth/register"
+                        className="px-4 py-2 bg-[#00E5FF] text-black font-bold font-mono uppercase text-xs hover:shadow-[0_0_18px_rgba(0,229,255,0.4)] transition-all"
+                    >
+                        Sign Up
+                    </Link>
+                </div>
+            ) : (
+                <div className="flex items-center gap-3 border border-white/10 bg-white/5 px-3 py-2">
+                    <div className="hidden md:flex flex-col text-right">
+                        <span className="text-[9px] uppercase tracking-[0.2em] text-gray-500">Active</span>
+                        <span className="text-xs font-mono text-white max-w-[140px] truncate">{user.email}</span>
+                    </div>
+                    <button
+                        onClick={() => logout()}
+                        className="px-3 py-1.5 border border-white/10 text-[10px] font-mono uppercase text-white hover:text-[#00E5FF] hover:border-[#00E5FF]/40 transition-colors"
+                    >
+                        Logout
+                    </button>
+                    <button
+                        onClick={() => setShowProfile(true)}
+                        className="p-2 hover:bg-white/10 rounded transition-colors"
+                        aria-label="Profile"
+                    >
+                        <User size={18} />
+                    </button>
+                </div>
+            )}
 
             {/* Profile Panel */}
-            {showProfile && <ProfilePanel onClose={() => setShowProfile(false)} />}
+            {showProfile && user && (
+                <ProfilePanel
+                    onClose={() => setShowProfile(false)}
+                    userEmail={user.email}
+                    onLogout={() => {
+                        logout()
+                        setShowProfile(false)
+                    }}
+                />
+            )}
         </div>
     )
 }
@@ -155,19 +194,13 @@ function RightNav() {
 // PROFILE SLIDE-OVER PANEL
 // ============================================
 
-function ProfilePanel({ onClose }: { onClose: () => void }) {
+function ProfilePanel({ onClose, userEmail, onLogout }: { onClose: () => void; userEmail: string; onLogout: () => void }) {
     const router = useRouter()
-    const [userEmail, setUserEmail] = useState<string | null>(null)
-
-    useEffect(() => {
-        const email = localStorage.getItem('user_email')
-        setUserEmail(email)
-    }, [])
 
     const handleLogout = () => {
-        localStorage.removeItem('kairon_token')
-        localStorage.removeItem('user_email')
-        router.push('/auth')
+        onLogout()
+        onClose()
+        router.push('/')
     }
 
     return (

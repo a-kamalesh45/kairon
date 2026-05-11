@@ -7,6 +7,7 @@ import { ArrowRight, Shield, Cpu, Activity, Terminal, Network, Database, Code2, 
 
 // Import your components
 import { StockTicker } from "@/components/LandingPage/Ticker"
+import { useAuth } from "@/context/AuthContext"
 
 // 2. Load the Globe ONLY on the client (Browser)
 // This fixes "window is not defined" because the server ignores this file.
@@ -15,6 +16,7 @@ const Globe = dynamic(() => import("@/components/LandingPage/Globe").then((m) =>
 });
 
 export default function LandingPage() {
+  const { user } = useAuth()
   return (
     <div className="min-h-screen" style={{ backgroundColor: 'var(--color-bg-app)', color: 'var(--color-text-primary)' }}>
 
@@ -59,15 +61,30 @@ export default function LandingPage() {
 
             {/* CTA Hierarchy - Single Dominant Action */}
             <div className="flex flex-col sm:flex-row gap-3 pt-2">
-              {/* PRIMARY CTA - Execution Signal */}
-              <Link href="/trade">
-                <button className="group px-10 py-4 bg-theme-accent text-black font-bold text-sm uppercase tracking-[0.2em] hover:bg-theme-accent-hover transition-colors w-full sm:w-auto">
-                  Launch Terminal
-                  <ArrowRight className="inline ml-2 w-4 h-4 group-hover:translate-x-0.5 transition-transform" />
-                </button>
-              </Link>
+              {user ? (
+                <Link href="/trade">
+                  <button className="group px-10 py-4 bg-theme-accent text-black font-bold text-sm uppercase tracking-[0.2em] hover:bg-theme-accent-hover transition-colors w-full sm:w-auto">
+                    Launch Terminal
+                    <ArrowRight className="inline ml-2 w-4 h-4 group-hover:translate-x-0.5 transition-transform" />
+                  </button>
+                </Link>
+              ) : (
+                <>
+                  <Link
+                    href="/auth/login"
+                    className="px-10 py-4 bg-theme-accent text-black font-bold text-sm uppercase tracking-[0.2em] hover:bg-theme-accent-hover transition-colors w-full sm:w-auto text-center"
+                  >
+                    Login to Launch
+                  </Link>
+                  <Link
+                    href="/auth/register"
+                    className="px-8 py-4 border border-theme text-theme-secondary text-xs uppercase tracking-widest hover:border-theme-hover hover:text-theme-primary transition-all font-mono w-full sm:w-auto text-center"
+                  >
+                    Create Account
+                  </Link>
+                </>
+              )}
 
-              {/* SECONDARY CTA - Outline Only */}
               <button className="px-8 py-4 border border-theme text-theme-secondary text-xs uppercase tracking-widest hover:border-theme-hover hover:text-theme-primary transition-all font-mono w-full sm:w-auto">
                 View Documentation
               </button>

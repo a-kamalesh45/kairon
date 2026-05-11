@@ -47,7 +47,15 @@ void OrderBook::matchOrders(Order &incomingOrder, std::string symbol)
             ll tradeQty = std::min(incomingOrder.quantity, bookOrder.quantity);
             
             // Update Last Traded Price
+            // Update Last Traded Price
             lastTradedPrice = bestPrice;
+
+            // --- NEW: EXECUTION LOGGING ---
+            std::cout << "\033[36m" // Cyan Color
+                      << "  ⚡ [EXECUTION] " << (tradeQty / 10000.0) 
+                      << " " << symbol << " matched @ $" << (bestPrice / 10000.0) 
+                      << "\033[0m" << std::endl;
+            // ------------------------------
 
             // === GENERATE TRADE EVENT (JSON) ===
             // We divide by 10000.0 to convert back to float for the UI
@@ -80,7 +88,15 @@ void OrderBook::matchOrders(Order &incomingOrder, std::string symbol)
 
             ll tradeQty = std::min(incomingOrder.quantity, bookOrder.quantity);
             
+            // Update Last Traded Price
             lastTradedPrice = bestPrice;
+
+            // --- NEW: EXECUTION LOGGING ---
+            std::cout << "\033[36m" // Cyan Color
+                      << "  ⚡ [EXECUTION] " << (tradeQty / 10000.0) 
+                      << " " << symbol << " matched @ $" << (bestPrice / 10000.0) 
+                      << "\033[0m" << std::endl;
+            // ------------------------------
 
             // === GENERATE TRADE EVENT (JSON) ===
             std::stringstream json;

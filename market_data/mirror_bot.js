@@ -2,7 +2,8 @@ const WebSocket = require('ws');
 const { createClient } = require('redis');
 
 const REDIS_URL = 'redis://localhost:6379';
-const ASSETS = ['btc', 'eth', 'bnb', 'sol', 'doge'];
+// The final 8 Institutional Assets
+const ASSETS = ['btc', 'eth', 'bnb', 'sol', 'doge', 'link', 'xrp', 'ltc'];
 const streams = ASSETS.map(coin => `${coin}usdt@trade`).join('/');
 const BINANCE_WS = `wss://stream.binance.com:443/stream?streams=${streams}`;
 
@@ -49,9 +50,8 @@ async function startBot() {
             // Payload: ID, QTY, PRICE, TYPE
             const payload = `${tradeData.t},${engineQty},${enginePrice},${side}`;
             
-            if(symbol === 'BTC') {
-                await publisher.rPush(`orders:${symbol}`, payload);
-            }
+           // ✅ New Code: Open the floodgates
+            await publisher.rPush(`orders:${symbol}`, payload);
 
         } catch (err) {
             console.error(`[ERROR] Processing Message: ${err.message}`);

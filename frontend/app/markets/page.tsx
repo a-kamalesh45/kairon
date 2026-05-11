@@ -18,16 +18,14 @@ interface CryptoData {
 }
 
 const MARKET_DATA: CryptoData[] = [
-    { symbol: 'BTC', name: 'Bitcoin', price: 88022.16, change24h: 0.33, volume24h: 35.8, marketCap: 1.75, icon: '₿', color: '#F7931A' },
-    { symbol: 'ETH', name: 'Ethereum', price: 2913.13, change24h: 0.87, volume24h: 24.51, marketCap: 351.91, icon: 'Ξ', color: '#627EEA' },
-    { symbol: 'USDT', name: 'Tether', price: 1.00, change24h: -0.04, volume24h: 83.45, marketCap: 186.27, icon: '₮', color: '#26A17B' },
-    { symbol: 'BNB', name: 'BNB', price: 883.23, change24h: 1.40, volume24h: 1.97, marketCap: 120.43, icon: '🔶', color: '#F3BA2F' },
-    { symbol: 'XRP', name: 'XRP', price: 1.89, change24h: 0.25, volume24h: 2.46, marketCap: 114.93, icon: '✕', color: '#23292F' },
-    { symbol: 'SOL', name: 'Solana', price: 142.30, change24h: 1.17, volume24h: 3.2, marketCap: 61.0, icon: '◎', color: '#9945FF' },
-    { symbol: 'ADA', name: 'Cardano', price: 1.12, change24h: -0.95, volume24h: 0.98, marketCap: 39.0, icon: '₳', color: '#0033AD' },
-    { symbol: 'AVAX', name: 'Avalanche', price: 78.90, change24h: 4.12, volume24h: 0.75, marketCap: 32.0, icon: '🔺', color: '#E84142' },
-    { symbol: 'DOT', name: 'Polkadot', price: 18.45, change24h: -1.23, volume24h: 0.52, marketCap: 28.5, icon: '●', color: '#E6007A' },
-    { symbol: 'MATIC', name: 'Polygon', price: 1.42, change24h: 2.15, volume24h: 0.61, marketCap: 13.2, icon: '⬡', color: '#8247E5' },
+    { symbol: 'BTC', name: 'Bitcoin', price: 0, change24h: 0, volume24h: 0, marketCap: 0, icon: '₿', color: '#F7931A' },
+    { symbol: 'ETH', name: 'Ethereum', price: 0, change24h: 0, volume24h: 0, marketCap: 0, icon: 'Ξ', color: '#627EEA' },
+    { symbol: 'BNB', name: 'BNB', price: 0, change24h: 0, volume24h: 0, marketCap: 0, icon: '🔶', color: '#F3BA2F' },
+    { symbol: 'SOL', name: 'Solana', price: 0, change24h: 0, volume24h: 0, marketCap: 0, icon: '◎', color: '#9945FF' },
+    { symbol: 'DOGE', name: 'Dogecoin', price: 0, change24h: 0, volume24h: 0, marketCap: 0, icon: 'Ð', color: '#C2A633' },
+    { symbol: 'LINK', name: 'Chainlink', price: 0, change24h: 0, volume24h: 0, marketCap: 0, icon: '⬡', color: '#2A5ADA' },
+    { symbol: 'XRP', name: 'XRP', price: 0, change24h: 0, volume24h: 0, marketCap: 0, icon: '✕', color: '#23292F' },
+    { symbol: 'LTC', name: 'Litecoin', price: 0, change24h: 0, volume24h: 0, marketCap: 0, icon: 'Ł', color: '#345D9D' },
 ]
 
 export default function MarketsPage() {

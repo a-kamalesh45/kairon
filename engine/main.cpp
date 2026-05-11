@@ -7,13 +7,17 @@
 #include <windows.h> 
 #include "OrderBook.hpp"
 
+// --- CONFIGURATION ---
+// Add any assets here to instantly spawn a new dedicated matching thread for it.
+// --- CONFIGURATION ---
+// Spawn exactly 8 dedicated CPU threads for these assets
+std::vector<std::string> ACTIVE_ASSETS = {"BTC", "ETH", "BNB", "SOL", "DOGE", "LINK", "XRP", "LTC"};
 // --- THE ENGINE ---
 class Exchange {
 public:
     std::map<std::string, OrderBook> orderBooks;
 
     void placeOrder(std::string symbol, Order order) {
-        // Pass symbol so OrderBook knows what to put in the JSON
         orderBooks[symbol].addOrder(order, symbol);
     }
 
@@ -21,7 +25,6 @@ public:
         return orderBooks[symbol].getTicker();
     }
 
-    // === NEW: Wrapper to get pending messages from OrderBook ===
     std::vector<std::string> getBroadcasts(std::string symbol) {
         return orderBooks[symbol].flushTrades();
     }
@@ -30,22 +33,21 @@ public:
 Exchange kairon;
 bool running = true;
 
-// --- THE CONSUMER THREAD ---
+// --- THE WORKER THREAD (One spawned per asset) ---
 DWORD WINAPI redisConsumerLoop(LPVOID lpParam) {
-    std::string symbol = "BTC"; 
+    // Safely cast the void pointer back to a string
+    std::string symbol = *(std::string*)lpParam; 
     SimpleRedis redis("127.0.0.1", 6379);
     
-    std::cout << "[REDIS-THREAD] Connecting to Redis for " << symbol << "..." << std::endl;
     if (!redis.connect()) {
-        std::cout << "[FATAL] Could not connect to Redis!" << std::endl;
+        std::cout << "\033[31m[FATAL] Thread " << symbol << " failed to connect to Redis!\033[0m" << std::endl;
         return 1;
     }
-    std::cout << "[REDIS-THREAD] Connected! Engine Ready." << std::endl;
+    
+    std::cout << "\033[32m[THREAD-BOOT] Engine core online for " << symbol << "\033[0m" << std::endl;
 
     while (running) {
-        // 1. Consume Order
         std::string payload = redis.consume("orders:" + symbol);
-        
         if (payload.empty()) continue;
 
         try {
@@ -65,52 +67,67 @@ DWORD WINAPI redisConsumerLoop(LPVOID lpParam) {
 
                 Order newOrder(id, qty, priceRaw, isBuy);
                 
-                // 2. Execute Order
+                // 1. Execute Math
                 kairon.placeOrder(symbol, newOrder);
 
-                // 3. CHECK FOR MATCHES & PUBLISH TO UI
-                // This is where the Engine becomes "Active"
+                // 2. Broadcast JSON
                 std::vector<std::string> trades = kairon.getBroadcasts(symbol);
                 for (const auto& json : trades) {
                     redis.publish("trade-updates", json);
-                    std::cout << "[MATCH] Trade Executed & Published!" << std::endl;
                 }
             }
         } catch (...) {
-            // Ignore malformed data
+            // Ignore malformed data silently to prevent engine stalling
         }
     }
     return 0;
 }
 
-// --- MAIN THREAD (UI) ---
+// --- MAIN ORCHESTRATOR ---
 int main() {
-    std::cout << "=== KAIRON ENGINE ONLINE (Win32 API Mode) ===" << std::endl;
+    std::cout << "=== KAIRON MULTI-CORE ENGINE INITIALIZING ===" << std::endl;
 
-    HANDLE hThread = CreateThread(NULL, 0, redisConsumerLoop, NULL, 0, NULL);
-
-    if (hThread == NULL) {
-        std::cout << "Failed to create background thread!" << std::endl;
-        return 1;
+    // 1. PRE-ALLOCATION (Memory Safety)
+    // We must build the map keys on the main thread BEFORE workers start.
+    for (const auto& sym : ACTIVE_ASSETS) {
+        kairon.orderBooks[sym] = OrderBook();
     }
 
-    // UI LOOP
+    // 2. SPAWN WORKER THREADS
+    std::vector<HANDLE> threads;
+    for (size_t i = 0; i < ACTIVE_ASSETS.size(); i++) {
+        // Pass the memory address of the symbol to the thread
+        HANDLE hThread = CreateThread(NULL, 0, redisConsumerLoop, (LPVOID)&ACTIVE_ASSETS[i], 0, NULL);
+        threads.push_back(hThread);
+    }
+
+    // Give threads 1 second to establish Redis connections
+    Sleep(1000); 
+
+    // 3. THE DASHBOARD UI LOOP
     while (true) {
-        std::cin.get(); // Wait for user to press ENTER
-        
-        Ticker t = kairon.getMarketData("BTC");
-        
         system("cls"); 
+        std::cout << "=========================================" << std::endl;
+        std::cout << "       KAIRON DARK POOL | LIVE FEED      " << std::endl;
+        std::cout << "=========================================" << std::endl;
         
-        std::cout << "--- KAIRON LIVE MONITOR (BTC) ---" << std::endl;
-        std::cout << "LTP:    $" << (t.lastPrice / 10000.0) << std::endl;
-        std::cout << "BID:    $" << (t.bestBid / 10000.0) << std::endl;
-        std::cout << "ASK:    $" << (t.bestAsk / 10000.0) << std::endl;
-        std::cout << "SPREAD: $" << (t.spread / 10000.0) << std::endl;
-        std::cout << "---------------------------------" << std::endl;
-        std::cout << "[Press ENTER to refresh view]" << std::endl;
+        for (const auto& sym : ACTIVE_ASSETS) {
+            Ticker t = kairon.getMarketData(sym);
+            if (t.lastPrice > 0) { // Only print if trades have occurred
+                std::cout << "[" << sym << "] "
+                          << " LTP: $" << (t.lastPrice / 10000.0) 
+                          << " | SPREAD: $" << (t.spread / 10000.0) 
+                          << std::endl;
+            } else {
+                std::cout << "[" << sym << "]  Awaiting Liquidity..." << std::endl;
+            }
+        }
+        
+        std::cout << "=========================================" << std::endl;
+        
+        // Auto-refresh the terminal every 1.5 seconds instead of waiting for a key press
+        Sleep(1500); 
     }
 
-    CloseHandle(hThread);
     return 0;
 }
