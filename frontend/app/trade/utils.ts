@@ -11,6 +11,12 @@ export const formatPrice = (price: number) => {
     return price.toFixed(4);
 }
 
+export const formatDisplayPrice = (value: number | null | undefined) => {
+    const safe = toPositiveNumber(value)
+    if (safe === null) return '--'
+    return formatPrice(safe)
+}
+
 export type CandlePoint = {
     time: number;
     open: number;

@@ -8,10 +8,19 @@ import { useAuth } from "@/context/AuthContext"
 import { Crypto, Trade, OrderBookItem, AVAILABLE_CRYPTOS } from './types'
 import { CryptoRow } from './components/CryptoRow'
 import { StatBox, PortfolioStat, OrderBookRow } from './components/UIComponents'
-import { formatNumber, formatPrice } from './utils'
+import { formatNumber, formatPrice, formatDisplayPrice, normalizeHistoryCandles, normalizeSymbol, toPositiveNumber } from './utils'
 import { ChevronDown, Zap, Wallet, BarChart3, TrendingUp, Activity, Star, Maximize } from 'lucide-react'
 import { createChart, ColorType, CrosshairMode, CandlestickSeries } from 'lightweight-charts'
 import type { IChartApi, ISeriesApi, Time } from 'lightweight-charts'
+
+type OrderRow = {
+    id: string
+    timestamp: string | number | Date
+    side: string
+    price: number
+    quantity: number
+    filled: number
+}
 
 export default function TradeTerminal() {
     const { theme } = useTheme()
@@ -25,8 +34,8 @@ export default function TradeTerminal() {
     const { user, logout } = useAuth()
 
     // WebSocket state
-    const [currentPrice, setCurrentPrice] = useState(0)
-    const [lastPrice, setLastPrice] = useState(0)
+    const [currentPrice, setCurrentPrice] = useState<number | null>(null)
+    const [lastPrice, setLastPrice] = useState<number | null>(null)
     const [trades, setTrades] = useState<Trade[]>([])
     const [asks, setAsks] = useState<OrderBookItem[]>([])
     const [bids, setBids] = useState<OrderBookItem[]>([])
@@ -38,8 +47,8 @@ export default function TradeTerminal() {
 
     // Orders tab state
     const [ordersTab, setOrdersTab] = useState<'OPEN' | 'HISTORY'>('OPEN')
-    const [openOrders, setOpenOrders] = useState<any[]>([])
-    const [orderHistory, setOrderHistory] = useState<any[]>([])
+    const [openOrders, setOpenOrders] = useState<OrderRow[]>([])
+    const [orderHistory, setOrderHistory] = useState<OrderRow[]>([])
     const [loadingOrders, setLoadingOrders] = useState(true)
 
     // Chart & WebSocket refs
@@ -47,8 +56,11 @@ export default function TradeTerminal() {
     const ws = useRef<WebSocket | null>(null)
     const chartRef = useRef<IChartApi | null>(null)
     const candleSeriesRef = useRef<ISeriesApi<"Candlestick"> | null>(null)
-    const currentPriceRef = useRef(0)
+    const currentPriceRef = useRef<number | null>(null)
     const currentCandle = useRef<{ time: Time; open: number; high: number; low: number; close: number } | null>(null)
+    const activeSymbolRef = useRef<string>(normalizeSymbol(selectedCrypto.symbol))
+    const wsSessionRef = useRef(0)
+    const chartSessionRef = useRef(0)
     const [chartPayloadInfo, setChartPayloadInfo] = useState<{ count: number; first?: number; last?: number } | null>(null)
 
     useEffect(() => setMounted(true), [])
@@ -126,78 +138,69 @@ export default function TradeTerminal() {
 
         chartRef.current = chart
         candleSeriesRef.current = candleSeries
-
+        const sessionId = ++chartSessionRef.current
+        const controller = new AbortController()
         let destroyed = false
 
         const loadChartData = async () => {
             try {
-                const res = await fetch(`/api/history?symbol=${selectedCrypto.symbol}`)
+                const res = await fetch(`/api/history?symbol=${selectedCrypto.symbol}`, { signal: controller.signal })
                 const data = await res.json()
 
-                if (Array.isArray(data) && data.length > 0) {
-                    const normalizeCandles = (raw: any[]): { time: number; open: number; high: number; low: number; close: number }[] => {
-                        let arr: any[] = []
-                        if (Array.isArray(raw[0])) {
-                            arr = raw.map(d => ({
-                                time: Math.floor(Number(d[0]) / 1000),
-                                open: parseFloat(d[1]),
-                                high: parseFloat(d[2]),
-                                low: parseFloat(d[3]),
-                                close: parseFloat(d[4])
-                            }))
-                        } else {
-                            arr = raw.map(d => ({
-                                time: Math.floor(Number(d.time)),
-                                open: Number(d.open),
-                                high: Number(d.high),
-                                low: Number(d.low),
-                                close: Number(d.close)
-                            }))
+                const formattedData = normalizeHistoryCandles(data)
+                if (destroyed || sessionId !== chartSessionRef.current) return
+
+                if (!formattedData.length) {
+                    setChartPayloadInfo(null)
+                    currentCandle.current = null
+                    return
+                }
+
+                const lcData = formattedData.map(d => ({
+                    time: (d.time > 10000000000 ? Math.floor(d.time / 1000) : d.time) as Time,
+                    open: d.open,
+                    high: d.high,
+                    low: d.low,
+                    close: d.close,
+                }))
+                const liveCandleSnapshot = currentCandle.current
+
+                try {
+                    candleSeries.setData(lcData)
+
+                    // Auto-scale recovery: fit historical data to view and ensure price series auto-scaling
+                    chart.timeScale().fitContent()
+                    candleSeries.priceScale().applyOptions({ autoScale: true })
+                    setChartPayloadInfo({ count: lcData.length, first: lcData[0].time as number, last: lcData[lcData.length - 1].time as number })
+
+                    const lastCandle = lcData[lcData.length - 1]
+                    const lastHistoryTime = lastCandle.time as number
+
+                    if (liveCandleSnapshot && (liveCandleSnapshot.time as number) >= lastHistoryTime) {
+                        currentCandle.current = liveCandleSnapshot
+                        candleSeries.update(liveCandleSnapshot)
+                        setCurrentPrice(liveCandleSnapshot.close)
+                        setLastPrice(liveCandleSnapshot.open)
+                        currentPriceRef.current = liveCandleSnapshot.close
+                    } else {
+                        currentCandle.current = {
+                            time: lastCandle.time,
+                            open: lastCandle.open,
+                            high: lastCandle.high,
+                            low: lastCandle.low,
+                            close: lastCandle.close
                         }
-
-                        arr = arr.filter(x => Number.isFinite(x.time) && Number.isFinite(x.open) && Number.isFinite(x.high) && Number.isFinite(x.low) && Number.isFinite(x.close))
-                        arr.sort((a, b) => a.time - b.time)
-
-                        const dedup: typeof arr = []
-                        for (const c of arr) {
-                            if (dedup.length && dedup[dedup.length - 1].time === c.time) {
-                                dedup[dedup.length - 1] = c
-                            } else {
-                                dedup.push(c)
-                            }
-                        }
-
-                        return dedup
+                        setCurrentPrice(lastCandle.close)
+                        setLastPrice(lastCandle.open)
+                        currentPriceRef.current = lastCandle.close
                     }
-
-                    const formattedData = normalizeCandles(data)
-
-                    if (formattedData.length > 0) {
-                        const lcData = formattedData.map(d => ({ time: d.time as Time, open: d.open, high: d.high, low: d.low, close: d.close }))
-
-                        if (!destroyed) {
-                            try {
-                                candleSeries.setData(lcData)
-                                setChartPayloadInfo({ count: lcData.length, first: lcData[0].time as number, last: lcData[lcData.length - 1].time as number })
-
-                                const lastCandle = lcData[lcData.length - 1]
-                                currentCandle.current = {
-                                    time: ((lastCandle.time as number) + 60) as Time,
-                                    open: lastCandle.close,
-                                    high: lastCandle.close,
-                                    low: lastCandle.close,
-                                    close: lastCandle.close
-                                }
-                                setCurrentPrice(lastCandle.close)
-                                setLastPrice(lastCandle.open)
-                            } catch (err) {
-                                console.error('candleSeries.setData failed', err)
-                            }
-                        }
-                    }
+                } catch (err) {
+                    console.error('candleSeries.setData failed', err)
                 }
             } catch (e) {
-                console.error("Failed to load chart data:", e)
+                if (!destroyed) {
+                    console.error("Failed to load chart data:", e)
+                }
             }
         }
 
@@ -212,8 +215,10 @@ export default function TradeTerminal() {
 
         return () => {
             destroyed = true
+            controller.abort()
             chartRef.current = null
             candleSeriesRef.current = null
+            currentCandle.current = null
             try { ro.disconnect() } catch (e) { /* ignore */ }
             chart.remove()
         }
@@ -221,6 +226,7 @@ export default function TradeTerminal() {
 
     // WebSocket for live updates
     useEffect(() => {
+        // open a single, long-lived socket tied only to the currently selected symbol
         ws.current = new WebSocket('ws://localhost:3001')
 
         ws.current.onopen = () => console.log('WebSocket connected')
@@ -229,56 +235,87 @@ export default function TradeTerminal() {
         ws.current.onmessage = (event) => {
             try {
                 const data = JSON.parse(event.data)
-                if (data.type === 'trade') {
-                    const { price, qty, side, time: timeStr } = data
-                    const numPrice = parseFloat(price)
-                    const numQty = parseFloat(qty)
 
-                    setLastPrice(currentPriceRef.current)
-                    setCurrentPrice(numPrice)
-                    currentPriceRef.current = numPrice
+                // Symbol filter: ignore messages that don't belong to the selected asset
+                if (data.type !== 'trade' || data.symbol !== selectedCrypto.symbol) return
 
-                    const nowSeconds = Math.floor(Date.now() / 1000)
-                    const candleTime = Math.floor(nowSeconds / 60) * 60
+                const { price, qty, side, time: timeStr } = data
+                const numPrice = parseFloat(price)
+                const numQty = parseFloat(qty)
+                const candleTime = Math.max(
+                    Math.floor(Date.now() / 1000 / 60) * 60,
+                    currentCandle.current ? (currentCandle.current.time as number) : 0
+                )
 
-                    if (!currentCandle.current) return
+                console.log("Live Trade Received:", data.symbol, numPrice, "Chart Time:", candleTime)
 
-                    if ((candleTime as Time) > (currentCandle.current.time as Time)) {
-                        const prevClose = currentCandle.current.close
-                        currentCandle.current = {
-                            time: candleTime as Time,
-                            open: prevClose,
-                            high: Math.max(prevClose, numPrice),
-                            low: Math.min(prevClose, numPrice),
-                            close: numPrice
-                        }
-                    } else {
-                        currentCandle.current.close = numPrice
-                        currentCandle.current.high = Math.max(currentCandle.current.high, numPrice)
-                        currentCandle.current.low = Math.min(currentCandle.current.low, numPrice)
+                // Data leak protection: ignore NaN or non-positive prices which cause "zero" drops
+                if (isNaN(numPrice) || numPrice <= 0) return
+
+                // Functional state update to avoid re-creating the socket on every tick
+                setCurrentPrice(prev => {
+                    setLastPrice(prev)
+                    return numPrice
+                })
+
+                // Null candle fallback: create a baseline candle when history is missing
+                if (!currentCandle.current) {
+                    currentCandle.current = {
+                        time: candleTime as Time,
+                        open: numPrice,
+                        high: numPrice,
+                        low: numPrice,
+                        close: numPrice,
                     }
-
-                    candleSeriesRef.current?.update(currentCandle.current)
-
-                    setTrades(prev => [
-                        { id: Math.random().toString(36).substr(2, 5), price: numPrice, qty: numQty, side, time: timeStr },
-                        ...prev.slice(0, 24)
-                    ])
-                    generateOrderBook(numPrice)
                 }
-            } catch (e) { console.error(e) }
+
+                if (candleTime > (currentCandle.current.time as number)) {
+                    const prevClose = currentCandle.current.close
+                    currentCandle.current = {
+                        time: candleTime as Time,
+                        open: prevClose,
+                        high: Math.max(prevClose, numPrice),
+                        low: Math.min(prevClose, numPrice),
+                        close: numPrice,
+                    }
+                } else {
+                    currentCandle.current.close = numPrice
+                    currentCandle.current.high = Math.max(currentCandle.current.high, numPrice)
+                    currentCandle.current.low = Math.min(currentCandle.current.low, numPrice)
+                }
+
+                candleSeriesRef.current?.update(currentCandle.current)
+
+                setTrades(prev => [
+                    { id: Math.random().toString(36).substr(2, 5), price: numPrice, qty: numQty, side, time: timeStr },
+                    ...prev.slice(0, 24),
+                ])
+
+                generateOrderBook(numPrice)
+            } catch (e) {
+                console.error(e)
+            }
         }
-        return () => { ws.current?.close() }
+
+        return () => {
+            ws.current?.close()
+            ws.current = null
+        }
+
+        // Only re-create the socket when the user switches the symbol
     }, [selectedCrypto.symbol])
 
     // State cleanup on asset switch
     useEffect(() => {
         // Clear recent trades & reset price counters
         setTrades([])
-        setCurrentPrice(selectedCrypto.price)
-        setLastPrice(selectedCrypto.price)
-        currentPriceRef.current = selectedCrypto.price
+        const safePrice = toPositiveNumber(selectedCrypto.price)
+        setCurrentPrice(safePrice)
+        setLastPrice(safePrice)
+        currentPriceRef.current = safePrice
         currentCandle.current = null
+        setChartPayloadInfo(null)
+        activeSymbolRef.current = normalizeSymbol(selectedCrypto.symbol)
 
         // Reset order form inputs
         setOrderPrice("")
@@ -290,25 +327,34 @@ export default function TradeTerminal() {
     }, [selectedCrypto.symbol])
 
     const generateOrderBook = (centerPrice: number) => {
+        const safePrice = toPositiveNumber(centerPrice)
+        if (safePrice === null) return
         const newAsks = []
         const newBids = []
-        const spread = centerPrice * 0.0001
+        const spread = safePrice * 0.0001
         for (let i = 1; i <= 20; i++) {
-            newAsks.push({ price: centerPrice + (i * spread), qty: Math.random() * 1.5, total: 0 })
-            newBids.push({ price: centerPrice - (i * spread), qty: Math.random() * 1.5, total: 0 })
+            newAsks.push({ price: safePrice + (i * spread), qty: Math.random() * 1.5, total: 0 })
+            newBids.push({ price: safePrice - (i * spread), qty: Math.random() * 1.5, total: 0 })
         }
         setAsks(newAsks.reverse())
         setBids(newBids)
     }
 
     const placeOrder = async (side: "buy" | "sell") => {
-        if (!orderQty) return alert("Enter Quantity")
+        const qtyValue = toPositiveNumber(orderQty)
+        if (!qtyValue) return alert("Enter Quantity")
         try {
             const token = localStorage.getItem('token') || localStorage.getItem('kairon_token')
 
             if (!token) {
                 console.error('Authentication error: missing JWT token')
                 alert('Authentication required. Please sign in again.')
+                return
+            }
+
+            const priceValue = toPositiveNumber(orderPrice) ?? toPositiveNumber(currentPrice)
+            if (!priceValue) {
+                alert('Price unavailable. Wait for a valid market tick.')
                 return
             }
 
@@ -321,8 +367,8 @@ export default function TradeTerminal() {
                 body: JSON.stringify({
                     symbol: selectedCrypto.symbol,
                     side,
-                    price: parseFloat(orderPrice) || currentPrice,
-                    qty: parseFloat(orderQty)
+                    price: priceValue,
+                    qty: qtyValue
                 })
             })
 
@@ -403,14 +449,14 @@ export default function TradeTerminal() {
         const sortedBids = [...bids].sort((a, b) => b.price - a.price)
         const sortedAsks = [...asks].sort((a, b) => a.price - b.price)
 
-        let cumulativeBids = []
+        const cumulativeBids = []
         let cumulative = 0
         for (const bid of sortedBids) {
             cumulative += bid.qty
             cumulativeBids.push({ price: bid.price, cumulative })
         }
 
-        let cumulativeAsks = []
+        const cumulativeAsks = []
         cumulative = 0
         for (const ask of sortedAsks) {
             cumulative += ask.qty
@@ -424,6 +470,15 @@ export default function TradeTerminal() {
         loadOpenOrders()
         loadOrderHistory()
     }, [selectedCrypto])
+
+    const safeCurrentPrice = toPositiveNumber(currentPrice) ?? toPositiveNumber(selectedCrypto.price)
+    const safeLastPrice = toPositiveNumber(lastPrice) ?? safeCurrentPrice
+    const priceIsUp = safeCurrentPrice !== null && safeLastPrice !== null
+        ? safeCurrentPrice >= safeLastPrice
+        : true
+    const displayPrice = safeCurrentPrice !== null ? formatPrice(safeCurrentPrice) : '--'
+    const displayHigh = safeCurrentPrice !== null ? formatPrice(safeCurrentPrice * 1.02) : '--'
+    const displayLow = safeCurrentPrice !== null ? formatPrice(safeCurrentPrice * 0.98) : '--'
 
     if (!mounted) return null
 
@@ -509,7 +564,7 @@ export default function TradeTerminal() {
                                                 onSelect={() => { setSelectedCrypto(crypto); setShowCryptoSelector(false) }}
                                                 isFavorite={favorites.has(crypto.symbol)}
                                                 onToggleFavorite={() => toggleFavorite(crypto.symbol)}
-                                                formatPrice={formatPrice}
+                                                formatPrice={formatDisplayPrice}
                                             />
                                         ))}
                                     </div>
@@ -519,8 +574,8 @@ export default function TradeTerminal() {
 
                         {/* Price Display */}
                         <div className="pl-6 border-l border-[#1A1D2A]">
-                            <div className={`text-2xl font-bold font-mono tabular-nums ${currentPrice >= lastPrice ? 'text-[#00E5FF]' : 'text-[#FF007A]'}`}>
-                                {formatPrice(currentPrice || selectedCrypto.price)}
+                            <div className={`text-2xl font-bold font-mono tabular-nums ${priceIsUp ? 'text-[#00E5FF]' : 'text-[#FF007A]'}`}>
+                                {displayPrice}
                             </div>
                             <div className="flex items-center gap-2 mt-0.5">
                                 <span className="text-[10px] text-[#8D8F98] font-mono uppercase">MARK</span>
@@ -541,8 +596,8 @@ export default function TradeTerminal() {
                     {/* Stats + Auth */}
                     <div className="flex items-center gap-6">
                         <div className="hidden lg:flex items-center gap-6">
-                            <StatBox label="24H HIGH" value={formatPrice(selectedCrypto.price * 1.02)} color="text-[#E6E6E6]" />
-                            <StatBox label="24H LOW" value={formatPrice(selectedCrypto.price * 0.98)} color="text-[#E6E6E6]" />
+                            <StatBox label="24H HIGH" value={displayHigh} color="text-[#E6E6E6]" />
+                            <StatBox label="24H LOW" value={displayLow} color="text-[#E6E6E6]" />
                             <StatBox label="24H VOL(USDT)" value={formatNumber(selectedCrypto.volume24h)} color="text-[#E6E6E6]" />
                             <StatBox label="FUNDING / 8H" value="0.0100%" color="text-[#00E5FF]" />
                         </div>
@@ -641,7 +696,7 @@ export default function TradeTerminal() {
                                 {orderType === 'limit' && (
                                     <div className="relative border border-[#1A1D2A] bg-[#080E14] flex items-center p-2.5 group hover:border-[#8D8F98] transition-colors focus-within:border-[#00E5FF]">
                                         <span className="text-xs text-[#8D8F98] font-mono w-14">Price</span>
-                                        <input type="number" value={orderPrice} onChange={e => setOrderPrice(e.target.value)} className="flex-1 bg-transparent text-right text-[#E6E6E6] text-sm font-mono outline-none" placeholder={formatPrice(selectedCrypto.price)} />
+                                        <input type="number" value={orderPrice} onChange={e => setOrderPrice(e.target.value)} className="flex-1 bg-transparent text-right text-[#E6E6E6] text-sm font-mono outline-none" placeholder={displayPrice} />
                                         <span className="text-xs text-[#E6E6E6] font-mono ml-2">USDT</span>
                                     </div>
                                 )}
@@ -763,10 +818,10 @@ export default function TradeTerminal() {
                     {/* Spread Info */}
                     <div className="py-2.5 px-4 flex items-center justify-between bg-[#080E14] border-y border-[#1A1D2A]">
                         <div className="flex items-center gap-3">
-                            <span className={`text-lg font-bold font-mono ${currentPrice >= lastPrice ? 'text-[#00E5FF]' : 'text-[#FF007A]'}`}>
-                                {formatPrice(currentPrice || selectedCrypto.price)}
+                            <span className={`text-lg font-bold font-mono ${priceIsUp ? 'text-[#00E5FF]' : 'text-[#FF007A]'}`}>
+                                {displayPrice}
                             </span>
-                            {currentPrice >= lastPrice ? (
+                            {priceIsUp ? (
                                 <span className="text-[#00E5FF] text-[10px]">↑</span>
                             ) : (
                                 <span className="text-[#FF007A] text-[10px]">↓</span>

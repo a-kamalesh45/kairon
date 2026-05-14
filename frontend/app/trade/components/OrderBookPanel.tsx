@@ -1,11 +1,11 @@
 import { Crypto, OrderBookItem, Trade } from '../types'
-import { formatPrice } from '../utils'
+import { formatDisplayPrice, formatPrice, toPositiveNumber } from '../utils'
 import { OrderBookRow } from './UIComponents'
 
 interface OrderBookPanelProps {
     selectedCrypto: Crypto
-    currentPrice: number
-    lastPrice: number
+    currentPrice: number | null
+    lastPrice: number | null
     asks: OrderBookItem[]
     bids: OrderBookItem[]
     trades: Trade[]
@@ -19,6 +19,12 @@ export function OrderBookPanel({
     bids,
     trades
 }: OrderBookPanelProps) {
+    const safeCurrentPrice = toPositiveNumber(currentPrice) ?? toPositiveNumber(selectedCrypto.price)
+    const safeLastPrice = toPositiveNumber(lastPrice) ?? safeCurrentPrice
+    const priceIsUp = safeCurrentPrice !== null && safeLastPrice !== null
+        ? safeCurrentPrice >= safeLastPrice
+        : true
+
     return (
         <div className="w-80 shrink-0 flex flex-col border-l border-white/10 bg-black">
             <div className="border-b border-white/10 px-4 py-3 bg-white/5">
@@ -39,8 +45,8 @@ export function OrderBookPanel({
                 </div>
 
                 <div className="py-3 px-4 border-y border-white/10 flex items-center justify-between bg-white/5">
-                    <span className={`text-xl font-bold font-mono ${currentPrice >= lastPrice ? 'text-[#00E5FF]' : 'text-[#FF006E]'}`}>
-                        ${formatPrice(currentPrice || selectedCrypto.price)}
+                    <span className={`text-xl font-bold font-mono ${priceIsUp ? 'text-[#00E5FF]' : 'text-[#FF006E]'}`}>
+                        ${formatDisplayPrice(safeCurrentPrice)}
                     </span>
                     <span className="text-xs text-gray-700 font-mono uppercase tracking-wider">
                         SPREAD

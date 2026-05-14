@@ -59,13 +59,14 @@ void OrderBook::matchOrders(Order &incomingOrder, std::string symbol)
 
             // === GENERATE TRADE EVENT (JSON) ===
             // We divide by 10000.0 to convert back to float for the UI
-            std::stringstream json;
-            json << "{\"type\":\"trade\","
-                 << "\"symbol\":\"" << symbol << "\","
-                 << "\"price\":" << (bestPrice / 10000.0) << ","
-                 << "\"qty\":" << (tradeQty / 10000.0) << ","
-                 << "\"side\":\"buy\","
-                 << "\"time\":\"" << get_time_str() << "\"}";
+              std::stringstream json;
+              json << "{\"type\":\"trade\","
+                  << "\"symbol\":\"" << symbol << "\","
+                  << "\"price\":" << (bestPrice / 10000.0) << ","
+                  << "\"qty\":" << (tradeQty / 10000.0) << ","
+                  << "\"side\":\"buy\","
+                  << "\"timestamp\":" << static_cast<long long>(std::time(nullptr)) << ","
+                  << "\"time\":\"" << get_time_str() << "\"}";
             
             pendingTrades.push_back(json.str());
             // ===================================
@@ -99,13 +100,14 @@ void OrderBook::matchOrders(Order &incomingOrder, std::string symbol)
             // ------------------------------
 
             // === GENERATE TRADE EVENT (JSON) ===
-            std::stringstream json;
-            json << "{\"type\":\"trade\","
-                 << "\"symbol\":\"" << symbol << "\","
-                 << "\"price\":" << (bestPrice / 10000.0) << ","
-                 << "\"qty\":" << (tradeQty / 10000.0) << ","
-                 << "\"side\":\"sell\","
-                 << "\"time\":\"" << get_time_str() << "\"}";
+              std::stringstream json;
+              json << "{\"type\":\"trade\","
+                  << "\"symbol\":\"" << symbol << "\","
+                  << "\"price\":" << (bestPrice / 10000.0) << ","
+                  << "\"qty\":" << (tradeQty / 10000.0) << ","
+                  << "\"side\":\"sell\","
+                  << "\"timestamp\":" << static_cast<long long>(std::time(nullptr)) << ","
+                  << "\"time\":\"" << get_time_str() << "\"}";
             
             pendingTrades.push_back(json.str());
             // ===================================

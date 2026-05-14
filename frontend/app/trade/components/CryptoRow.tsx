@@ -7,7 +7,7 @@ export function CryptoRow({ crypto, selected, onSelect, isFavorite, onToggleFavo
     onSelect: () => void;
     isFavorite: boolean;
     onToggleFavorite: () => void;
-    formatPrice: (n: number) => string;
+    formatPrice: (n: number | null | undefined) => string;
 }) {
     return (
         <div

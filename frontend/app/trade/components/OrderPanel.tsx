@@ -1,11 +1,11 @@
 import { Zap, Wallet, BarChart3, TrendingUp, Activity } from 'lucide-react'
 import { Crypto } from '../types'
-import { formatPrice } from '../utils'
+import { formatDisplayPrice } from '../utils'
 import { PortfolioStat } from './UIComponents'
 
 interface OrderPanelProps {
     selectedCrypto: Crypto
-    currentPrice: number
+    currentPrice: number | null
     orderQty: string
     orderPrice: string
     orderType: 'limit' | 'market'
@@ -61,7 +61,7 @@ export function OrderPanel({
                                     <span className="absolute left-0 top-1/2 -translate-y-1/2 text-gray-500 font-mono text-sm">$</span>
                                     <input
                                         type="number"
-                                        placeholder={formatPrice(selectedCrypto.price)}
+                                        placeholder={formatDisplayPrice(selectedCrypto.price)}
                                         value={orderPrice}
                                         onChange={e => setOrderPrice(e.target.value)}
                                         className="w-full pl-4 pr-2 pb-2 bg-transparent border-0 border-b border-white/20 text-white text-base outline-none focus:border-[#00E5FF] transition-all duration-150 font-mono placeholder-gray-700"

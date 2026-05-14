@@ -1,6 +1,6 @@
 import { ChevronDown } from 'lucide-react'
 import { Crypto, AVAILABLE_CRYPTOS } from '../types'
-import { formatPrice, formatNumber } from '../utils'
+import { formatDisplayPrice, formatNumber, formatPrice, toPositiveNumber } from '../utils'
 import { StatBox } from './UIComponents'
 import { CryptoRow } from './CryptoRow'
 
@@ -13,8 +13,8 @@ interface AssetHeaderProps {
     favorites: Set<string>
     onSelectCrypto: (crypto: Crypto) => void
     onToggleFavorite: (symbol: string) => void
-    currentPrice: number
-    lastPrice: number
+    currentPrice: number | null
+    lastPrice: number | null
 }
 
 export function AssetHeader({
@@ -29,6 +29,15 @@ export function AssetHeader({
     currentPrice,
     lastPrice
 }: AssetHeaderProps) {
+    const safeCurrentPrice = toPositiveNumber(currentPrice) ?? toPositiveNumber(selectedCrypto.price)
+    const safeLastPrice = toPositiveNumber(lastPrice) ?? safeCurrentPrice
+    const priceIsUp = safeCurrentPrice !== null && safeLastPrice !== null
+        ? safeCurrentPrice >= safeLastPrice
+        : true
+    const displayPrice = formatDisplayPrice(safeCurrentPrice)
+    const displayHigh = safeCurrentPrice !== null ? formatPrice(safeCurrentPrice * 1.02) : '--'
+    const displayLow = safeCurrentPrice !== null ? formatPrice(safeCurrentPrice * 0.98) : '--'
+
     const filteredCryptos = AVAILABLE_CRYPTOS.filter(crypto =>
         crypto.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
         crypto.symbol.toLowerCase().includes(searchTerm.toLowerCase())
@@ -110,7 +119,7 @@ export function AssetHeader({
                                             onSelect={() => { onSelectCrypto(crypto); setShowCryptoSelector(false); }}
                                             isFavorite={favorites.has(crypto.symbol)}
                                             onToggleFavorite={() => onToggleFavorite(crypto.symbol)}
-                                            formatPrice={formatPrice}
+                                            formatPrice={formatDisplayPrice}
                                         />
                                     ))}
                                 </div>
@@ -121,8 +130,8 @@ export function AssetHeader({
                     <div className="pl-8 border-l border-white/10">
                         <div className="flex items-baseline gap-2">
                             <span className="text-xs text-gray-600 font-mono uppercase tracking-wider">MARK</span>
-                            <span className={`text-5xl font-bold font-mono tabular-nums ${currentPrice >= lastPrice ? 'text-[#00E5FF]' : 'text-[#FF006E]'}`} style={{ textShadow: currentPrice >= lastPrice ? '0 0 20px rgba(0,229,255,0.5)' : '0 0 20px rgba(255,0,110,0.5)' }}>
-                                ${formatPrice(currentPrice || selectedCrypto.price)}
+                            <span className={`text-5xl font-bold font-mono tabular-nums ${priceIsUp ? 'text-[#00E5FF]' : 'text-[#FF006E]'}`} style={{ textShadow: priceIsUp ? '0 0 20px rgba(0,229,255,0.5)' : '0 0 20px rgba(255,0,110,0.5)' }}>
+                                ${displayPrice}
                             </span>
                         </div>
                         <div className="flex items-center gap-4 mt-2">
@@ -141,8 +150,8 @@ export function AssetHeader({
                 <div className="hidden lg:flex items-center gap-8">
                     <StatBox label="24H VOL" value={formatNumber(selectedCrypto.volume24h)} />
                     <StatBox label="MKT CAP" value={formatNumber(selectedCrypto.marketCap)} />
-                    <StatBox label="24H HIGH" value={`$${formatPrice(selectedCrypto.price * 1.02)}`} color="text-[#00E5FF]" />
-                    <StatBox label="24H LOW" value={`$${formatPrice(selectedCrypto.price * 0.98)}`} color="text-[#FF006E]" />
+                    <StatBox label="24H HIGH" value={`$${displayHigh}`} color="text-[#00E5FF]" />
+                    <StatBox label="24H LOW" value={`$${displayLow}`} color="text-[#FF006E]" />
                 </div>
             </div>
         </div>

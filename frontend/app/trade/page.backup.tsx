@@ -6,7 +6,7 @@ import { TraderProfileCard } from '@/components/TraderProfileCard'
 import { Crypto, Trade, OrderBookItem, AVAILABLE_CRYPTOS } from './types'
 import { CryptoRow } from './components/CryptoRow'
 import { StatBox, PortfolioStat, OrderBookRow } from './components/UIComponents'
-import { formatNumber, formatPrice } from './utils'
+import { formatDisplayPrice, formatNumber, formatPrice, toPositiveNumber } from './utils'
 import { ChevronDown, Zap, Wallet, BarChart3, TrendingUp, Activity, Star } from 'lucide-react'
 import { createChart, ColorType, CrosshairMode, CandlestickSeries } from 'lightweight-charts'
 import type { IChartApi, ISeriesApi, Time } from 'lightweight-charts'
@@ -385,6 +385,16 @@ export default function TradeTerminal() {
         loadOrderHistory()
     }, [selectedCrypto])
 
+    const safeCurrentPrice = toPositiveNumber(currentPrice) ?? toPositiveNumber(selectedCrypto.price)
+    const safeLastPrice = toPositiveNumber(lastPrice) ?? safeCurrentPrice
+    const priceIsUp = safeCurrentPrice !== null && safeLastPrice !== null
+        ? safeCurrentPrice >= safeLastPrice
+        : true
+    const displayPrice = formatDisplayPrice(safeCurrentPrice)
+    const displayHigh = safeCurrentPrice !== null ? formatPrice(safeCurrentPrice * 1.02) : '--'
+    const displayLow = safeCurrentPrice !== null ? formatPrice(safeCurrentPrice * 0.98) : '--'
+    const displaySelectedPrice = formatDisplayPrice(selectedCrypto.price)
+
     if (!mounted) return null
 
     return (
@@ -469,7 +479,7 @@ export default function TradeTerminal() {
                                                 onSelect={() => { setSelectedCrypto(crypto); setShowCryptoSelector(false) }}
                                                 isFavorite={favorites.has(crypto.symbol)}
                                                 onToggleFavorite={() => toggleFavorite(crypto.symbol)}
-                                                formatPrice={formatPrice}
+                                                formatPrice={formatDisplayPrice}
                                             />
                                         ))}
                                     </div>
@@ -481,8 +491,8 @@ export default function TradeTerminal() {
                         <div className="pl-8 border-l border-white/10">
                             <div className="flex items-baseline gap-2">
                                 <span className="text-xs text-gray-600 font-mono uppercase">MARK</span>
-                                <span className={`text-5xl font-bold font-mono tabular-nums ${currentPrice >= lastPrice ? 'text-[#00E5FF]' : 'text-[#FF006E]'}`}>
-                                    ${formatPrice(currentPrice || selectedCrypto.price)}
+                                <span className={`text-5xl font-bold font-mono tabular-nums ${priceIsUp ? 'text-[#00E5FF]' : 'text-[#FF006E]'}`}>
+                                    ${displayPrice}
                                 </span>
                             </div>
                             <div className="flex items-center gap-4 mt-2">
@@ -502,8 +512,8 @@ export default function TradeTerminal() {
                     <div className="hidden lg:flex items-center gap-8">
                         <StatBox label="24H VOL" value={formatNumber(selectedCrypto.volume24h)} />
                         <StatBox label="MKT CAP" value={formatNumber(selectedCrypto.marketCap)} />
-                        <StatBox label="24H HIGH" value={`$${formatPrice(selectedCrypto.price * 1.02)}`} color="text-[#00E5FF]" />
-                        <StatBox label="24H LOW" value={`$${formatPrice(selectedCrypto.price * 0.98)}`} color="text-[#FF006E]" />
+                        <StatBox label="24H HIGH" value={`$${displayHigh}`} color="text-[#00E5FF]" />
+                        <StatBox label="24H LOW" value={`$${displayLow}`} color="text-[#FF006E]" />
                     </div>
                 </div>
             </div>
@@ -607,7 +617,7 @@ export default function TradeTerminal() {
                                     {orderType === 'limit' && (
                                         <div>
                                             <label className="text-[10px] text-gray-600 mb-2 block font-mono uppercase">PRICE</label>
-                                            <input type="number" placeholder={formatPrice(selectedCrypto.price)} value={orderPrice} onChange={e => setOrderPrice(e.target.value)} className="w-full pl-4 pr-2 pb-2 bg-transparent border-0 border-b border-white/20 text-white outline-none focus:border-[#00E5FF] font-mono placeholder-gray-700" />
+                                            <input type="number" placeholder={displaySelectedPrice} value={orderPrice} onChange={e => setOrderPrice(e.target.value)} className="w-full pl-4 pr-2 pb-2 bg-transparent border-0 border-b border-white/20 text-white outline-none focus:border-[#00E5FF] font-mono placeholder-gray-700" />
                                         </div>
                                     )}
                                     <div className={orderType === 'market' ? 'col-span-2' : ''}>
@@ -656,8 +666,8 @@ export default function TradeTerminal() {
                         </div>
 
                         <div className="py-3 px-4 border-y border-white/10 flex items-center justify-between bg-white/5">
-                            <span className={`text-xl font-bold font-mono ${currentPrice >= lastPrice ? 'text-[#00E5FF]' : 'text-[#FF006E]'}`}>
-                                ${formatPrice(currentPrice || selectedCrypto.price)}
+                            <span className={`text-xl font-bold font-mono ${priceIsUp ? 'text-[#00E5FF]' : 'text-[#FF006E]'}`}>
+                                ${displayPrice}
                             </span>
                             <span className="text-xs text-gray-700 font-mono uppercase">SPREAD</span>
                         </div>
