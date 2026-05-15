@@ -81,7 +81,7 @@ export function useChartInit({ theme, mounted, selectedCrypto, onPriceUpdate }: 
                             }))
                         } else {
                             arr = raw.map(d => ({
-                                time: Math.floor(Number(d.time)),
+                                time: Number(d.time) > 1e12 ? Math.floor(Number(d.time) / 1000) : Math.floor(Number(d.time)),
                                 open: Number(d.open),
                                 high: Number(d.high),
                                 low: Number(d.low),
@@ -120,7 +120,7 @@ export function useChartInit({ theme, mounted, selectedCrypto, onPriceUpdate }: 
 
                             const lastCandle = lcData[lcData.length - 1]
                             currentCandle.current = {
-                                time: ((lastCandle.time as number) + 60) as Time,
+                                time: (Math.floor(Date.now() / 1000 / 60) * 60) as Time,
                                 open: lastCandle.close,
                                 high: lastCandle.close,
                                 low: lastCandle.close,

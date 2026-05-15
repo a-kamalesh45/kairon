@@ -36,6 +36,8 @@ export default function TradeTerminal() {
     // WebSocket state
     const [currentPrice, setCurrentPrice] = useState<number | null>(null)
     const [lastPrice, setLastPrice] = useState<number | null>(null)
+    const [high24h, setHigh24h] = useState<number | null>(null)
+    const [low24h, setLow24h] = useState<number | null>(null)
     const [trades, setTrades] = useState<Trade[]>([])
     const [asks, setAsks] = useState<OrderBookItem[]>([])
     const [bids, setBids] = useState<OrderBookItem[]>([])
@@ -165,15 +167,31 @@ export default function TradeTerminal() {
                 }))
                 const liveCandleSnapshot = currentCandle.current
 
+                // 1. Filter out invalid/NaN data
+                let validData = lcData.filter(d => d.open > 0 && d.close > 0 && !isNaN(d.time as number))
+
+                // 2. Strictly sort chronologically (oldest to newest)
+                validData.sort((a, b) => (a.time as number) - (b.time as number))
+
+                // 3. Deduplicate timestamps (lightweight-charts crashes on duplicates)
+                const dedupedData: typeof validData = []
+                for (const item of validData) {
+                    if (dedupedData.length === 0 || dedupedData[dedupedData.length - 1].time !== item.time) {
+                        dedupedData.push(item)
+                    } else {
+                        dedupedData[dedupedData.length - 1] = item // Overwrite duplicate with latest
+                    }
+                }
+
                 try {
-                    candleSeries.setData(lcData)
+                    candleSeries.setData(dedupedData)
 
                     // Auto-scale recovery: fit historical data to view and ensure price series auto-scaling
                     chart.timeScale().fitContent()
                     candleSeries.priceScale().applyOptions({ autoScale: true })
-                    setChartPayloadInfo({ count: lcData.length, first: lcData[0].time as number, last: lcData[lcData.length - 1].time as number })
+                    setChartPayloadInfo({ count: dedupedData.length, first: dedupedData[0].time as number, last: dedupedData[dedupedData.length - 1].time as number })
 
-                    const lastCandle = lcData[lcData.length - 1]
+                    const lastCandle = dedupedData[dedupedData.length - 1]
                     const lastHistoryTime = lastCandle.time as number
 
                     if (liveCandleSnapshot && (liveCandleSnapshot.time as number) >= lastHistoryTime) {
@@ -236,14 +254,23 @@ export default function TradeTerminal() {
             try {
                 const data = JSON.parse(event.data)
 
+                // Catch the C++ Engine Reset Command
+                if (data.type === 'sys' && data.msg === 'RESYNC') {
+                    window.location.reload();
+                    return;
+                }
+
                 // Symbol filter: ignore messages that don't belong to the selected asset
                 if (data.type !== 'trade' || data.symbol !== selectedCrypto.symbol) return
 
                 const { price, qty, side, time: timeStr } = data
                 const numPrice = parseFloat(price)
                 const numQty = parseFloat(qty)
+
+                // FIX: Use Binance server time instead of Date.now() to prevent drift collision
+                const tradeTimeSeconds = Math.floor(parseInt(timeStr) / 1000)
                 const candleTime = Math.max(
-                    Math.floor(Date.now() / 1000 / 60) * 60,
+                    Math.floor(tradeTimeSeconds / 60) * 60,
                     currentCandle.current ? (currentCandle.current.time as number) : 0
                 )
 
@@ -257,6 +284,8 @@ export default function TradeTerminal() {
                     setLastPrice(prev)
                     return numPrice
                 })
+                setHigh24h(prev => prev === null ? numPrice : Math.max(prev, numPrice))
+                setLow24h(prev => prev === null ? numPrice : Math.min(prev, numPrice))
 
                 // Null candle fallback: create a baseline candle when history is missing
                 if (!currentCandle.current) {
@@ -285,6 +314,7 @@ export default function TradeTerminal() {
                 }
 
                 candleSeriesRef.current?.update(currentCandle.current)
+                chartRef.current?.timeScale().scrollToRealTime()
 
                 setTrades(prev => [
                     { id: Math.random().toString(36).substr(2, 5), price: numPrice, qty: numQty, side, time: timeStr },
@@ -312,6 +342,8 @@ export default function TradeTerminal() {
         const safePrice = toPositiveNumber(selectedCrypto.price)
         setCurrentPrice(safePrice)
         setLastPrice(safePrice)
+        setHigh24h(null)
+        setLow24h(null)
         currentPriceRef.current = safePrice
         currentCandle.current = null
         setChartPayloadInfo(null)
@@ -358,7 +390,7 @@ export default function TradeTerminal() {
                 return
             }
 
-            const res = await fetch('/api/trade/order', {
+            const res = await fetch('http://localhost:3001/order', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
@@ -387,6 +419,18 @@ export default function TradeTerminal() {
             alert(`${side.toUpperCase()} order placed for ${selectedCrypto.symbol}!`)
         } catch (e) { alert("Gateway Error") }
     }
+
+    const handleResync = async () => {
+        try {
+            await fetch('http://localhost:3001/resync', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ symbol: selectedCrypto.symbol })
+            });
+        } catch (e) {
+            console.error("Resync failed", e);
+        }
+    };
 
     const loadOpenOrders = async () => {
         try {
@@ -477,8 +521,8 @@ export default function TradeTerminal() {
         ? safeCurrentPrice >= safeLastPrice
         : true
     const displayPrice = safeCurrentPrice !== null ? formatPrice(safeCurrentPrice) : '--'
-    const displayHigh = safeCurrentPrice !== null ? formatPrice(safeCurrentPrice * 1.02) : '--'
-    const displayLow = safeCurrentPrice !== null ? formatPrice(safeCurrentPrice * 0.98) : '--'
+    const displayHigh = high24h !== null ? formatPrice(high24h) : '--'
+    const displayLow = low24h !== null ? formatPrice(low24h) : '--'
 
     if (!mounted) return null
 
@@ -601,6 +645,13 @@ export default function TradeTerminal() {
                             <StatBox label="24H VOL(USDT)" value={formatNumber(selectedCrypto.volume24h)} color="text-[#E6E6E6]" />
                             <StatBox label="FUNDING / 8H" value="0.0100%" color="text-[#00E5FF]" />
                         </div>
+
+                        <button
+                            onClick={handleResync}
+                            className="px-4 py-2 border border-[#FF007A]/50 bg-[#FF007A]/10 text-[#FF007A] font-bold font-mono uppercase text-xs hover:bg-[#FF007A]/20 hover:shadow-[0_0_15px_rgba(255,0,122,0.3)] transition-all"
+                        >
+                            RESYNC ENGINE
+                        </button>
 
                         <div className="flex items-center gap-3 border border-white/10 bg-[#0d1117]/60 backdrop-blur-md px-3 py-2">
                             {!user ? (

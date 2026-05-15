@@ -15,6 +15,8 @@ interface AssetHeaderProps {
     onToggleFavorite: (symbol: string) => void
     currentPrice: number | null
     lastPrice: number | null
+    high24h: number | null
+    low24h: number | null
 }
 
 export function AssetHeader({
@@ -27,7 +29,9 @@ export function AssetHeader({
     onSelectCrypto,
     onToggleFavorite,
     currentPrice,
-    lastPrice
+    lastPrice,
+    high24h,
+    low24h
 }: AssetHeaderProps) {
     const safeCurrentPrice = toPositiveNumber(currentPrice) ?? toPositiveNumber(selectedCrypto.price)
     const safeLastPrice = toPositiveNumber(lastPrice) ?? safeCurrentPrice
@@ -35,8 +39,8 @@ export function AssetHeader({
         ? safeCurrentPrice >= safeLastPrice
         : true
     const displayPrice = formatDisplayPrice(safeCurrentPrice)
-    const displayHigh = safeCurrentPrice !== null ? formatPrice(safeCurrentPrice * 1.02) : '--'
-    const displayLow = safeCurrentPrice !== null ? formatPrice(safeCurrentPrice * 0.98) : '--'
+    const displayHigh = high24h !== null ? formatPrice(high24h) : '--'
+    const displayLow  = low24h !== null ? formatPrice(low24h) : '--'
 
     const filteredCryptos = AVAILABLE_CRYPTOS.filter(crypto =>
         crypto.name.toLowerCase().includes(searchTerm.toLowerCase()) ||

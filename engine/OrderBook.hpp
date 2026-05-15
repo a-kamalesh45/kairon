@@ -6,6 +6,7 @@
 #include <functional>
 
 #define ll long long
+
 struct Order 
 {
     ll id; 
@@ -36,21 +37,33 @@ private:
     std::map<ll, std::deque<Order>> asks;
     
     ll lastTradedPrice = 0; 
-
-    // === NEW: Buffer to store trade events ===
     std::vector<std::string> pendingTrades;
 
-    // Modified matchOrders to accept symbol for JSON generation
+    // === NEW: REALITY FORK VARIABLES ===
+    ll priceOffset = 0;     // The mathematical gap between Kairon and Binance
+    bool isDiverged = false; // Flag to indicate if we are in an isolated state
+
     void matchOrders(Order &IncomingOrder, std::string symbol);
+    void executeSyntheticUIOrder(Order &order, std::string symbol); // Local market impact math
 
 public:
-    void addOrder(Order order, std::string symbol);
+    // Upgraded to accept the isUI flag
+    void addOrder(Order order, std::string symbol, bool isUI);
+    
     Ticker getTicker();
     
-    // === NEW: Method to retrieve and clear pending trades ===
     std::vector<std::string> flushTrades() {
         std::vector<std::string> temp = pendingTrades;
         pendingTrades.clear();
         return temp;
+    }
+
+    // === NEW: THE KILL-SWITCH ===
+    void resyncToWorld() {
+        priceOffset = 0;
+        isDiverged = false;
+        bids.clear();
+        asks.clear();
+        pendingTrades.push_back("{\"type\":\"sys\",\"msg\":\"RESYNC\"}");
     }
 };

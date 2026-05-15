@@ -121,7 +121,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         }
     }, [])
 
-    const requestAuth = useCallback(async (endpoint: string, body: Record<string, string>, persist: boolean) => {
+    const requestAuth = useCallback(async (endpoint: string, body: Record<string, unknown>, persist: boolean) => {
         setIsLoading(true)
         try {
             const res = await fetch(endpoint, {
@@ -148,11 +148,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }, [saveSession])
 
     const login = useCallback(async (identifier: string, password: string, remember = true) => {
-        await requestAuth("/api/auth/login", { identifier, password }, remember)
+        await requestAuth("/api/auth/login", { identifier, password } as Record<string, unknown>, remember)
     }, [requestAuth])
 
     const register = useCallback(async (payload: RegisterPayload) => {
-        await requestAuth("/api/auth/register", payload, true)
+        await requestAuth("/api/auth/register", payload as unknown as Record<string, unknown>, true)
     }, [requestAuth])
 
     const logout = useCallback(() => {

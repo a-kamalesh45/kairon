@@ -35,10 +35,14 @@ async function startServer() {
     await redisSubscriber.subscribe('trade-updates', (message) => {
         try {
             const tradeData = JSON.parse(message);
-            // HEARTBEAT LOG FOR THE UI CONNECTION
-            console.log(`\x1b[35m[GATEWAY] Broadcasting -> ${tradeData.symbol} @ $${tradeData.price}\x1b[0m`);
             
-            // Broadcast ALL symbols (No BTC hardcode!)
+            // Check if it's a System Command (like RESYNC) or a normal trade
+            if (tradeData.type === 'sys') {
+                console.log(`\x1b[41m\x1b[37m[GATEWAY] System Alert: ${tradeData.msg}\x1b[0m`);
+            } else {
+                // MUTED: Stop spamming every single Binance trade
+                // console.log(`\x1b[35m[GATEWAY] Broadcasting -> ${tradeData.symbol} @ $${tradeData.price}\x1b[0m`);
+            }
             broadcast(tradeData);
         } catch (err) {
             console.error("Failed to parse trade-update", err);
@@ -62,7 +66,8 @@ async function startServer() {
             const isBuy = (side === 'buy') ? "1" : "0";
             
             const orderId = Date.now(); 
-            const payload = `${orderId},${engineQty},${enginePrice},${isBuy}`;
+            
+            const payload = `${orderId},${engineQty},${enginePrice},${isBuy},1`;
             
             console.log(`\n\x1b[33m🚨 [UI ORDER] ${side.toUpperCase()} ${qty} ${symbol} @ $${executePrice}\x1b[0m`);
 
@@ -72,6 +77,19 @@ async function startServer() {
         } catch (err) {
             console.error("[GATEWAY ERROR]", err);
             res.status(500).json({ error: "Internal Server Error" });
+        }
+    });
+
+    app.post('/resync', async (req, res) => {
+        try {
+            const { symbol } = req.body;
+            console.log(`\x1b[41m\x1b[37m🚨 [UI COMMAND] FORCING REALITY RESYNC ON ${symbol}\x1b[0m`);
+            
+            await redisPublisher.rPush(`orders:${symbol}`, "RESYNC");
+            res.status(200).json({ success: true });
+        } catch (err) {
+            console.error("[RESYNC ERROR]", err);
+            res.status(500).json({ error: "Failed to trigger resync" });
         }
     });
 }
