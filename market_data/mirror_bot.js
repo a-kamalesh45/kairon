@@ -40,7 +40,7 @@ async function startBot() {
 
             const enginePrice = Math.floor(price * 10000);
             const engineQty = Math.floor(qty * 10000);
-            const payload = `${tradeData.t},${engineQty},${enginePrice},${side}`;
+            const payload = `${tradeData.E},${engineQty},${enginePrice},${side}`;
             
             // PUSH EVERYTHING TO REDIS (No more BTC hardcode!)
             await publisher.rPush(`orders:${symbol}`, payload);

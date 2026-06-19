@@ -146,7 +146,7 @@ export default function TradeTerminal() {
 
         const loadChartData = async () => {
             try {
-                const res = await fetch(`/api/history?symbol=${selectedCrypto.symbol}`, { signal: controller.signal })
+                const res = await fetch(`/api/history?symbol=${selectedCrypto.symbol}&interval=1m`, { signal: controller.signal })
                 const data = await res.json()
 
                 const formattedData = normalizeHistoryCandles(data)
