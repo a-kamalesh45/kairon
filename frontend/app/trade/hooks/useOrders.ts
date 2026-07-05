@@ -74,7 +74,7 @@ export function useOrders({
 
     const placeOrder = useCallback(async (symbol: string, side: 'buy' | 'sell', price: number, qty: number) => {
         try {
-            await fetch('http://localhost:3001/order', {
+            await fetch('http://localhost:3001/api/trade/order', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ symbol, side, price, qty })

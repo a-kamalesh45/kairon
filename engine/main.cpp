@@ -29,7 +29,7 @@ public:
         return orderBooks[symbol].flushTrades();
     }
 
-    void triggerResync(std::string symbol) 
+    void triggerResync(std::string symbol)
     {
         orderBooks[symbol].resyncToWorld();
     }
@@ -47,7 +47,7 @@ DWORD WINAPI redisConsumerLoop(LPVOID lpParam)
     if (!redis.connect())
     {
         std::cout << "\033[31m[FATAL] Thread " << symbol << " failed to connect to Redis!\033[0m" << std::endl;
-        delete symPtr; 
+        delete symPtr;
         return 1;
     }
 
@@ -59,7 +59,8 @@ DWORD WINAPI redisConsumerLoop(LPVOID lpParam)
         if (payload.empty()) continue;
 
         // === THE KILL-SWITCH INTERCEPT ===
-        if (payload == "RESYNC") {
+        if (payload == "RESYNC")
+        {
             std::cout << "\n\033[41m\033[37m 🚨 REALITY RESYNC TRIGGERED FOR " << symbol << " 🚨 \033[0m\n" << std::endl;
             kairon.triggerResync(symbol);
             continue;
@@ -67,25 +68,23 @@ DWORD WINAPI redisConsumerLoop(LPVOID lpParam)
 
         try
         {
-            std::stringstream ss(payload);
-            std::string segment;
             std::vector<std::string> parts;
+            std::stringstream ss(payload);
+            std::string item;
+            while (std::getline(ss, item, ',')) parts.push_back(item);
 
-            while (std::getline(ss, segment, ','))
-            {
-                parts.push_back(segment);
-            }
-
-            if (parts.size() >= 4)
+            // Payload: ID (0), Qty (1), Price (2), Side (3), IsUI (4), UserID (5)
+            if (parts.size() >= 6)
             {
                 long long id = std::stoll(parts[0]);
                 long long qty = std::stoll(parts[1]);
                 double priceRaw = std::stod(parts[2]) / 10000.0;
                 bool isBuy = (parts[3] == "1");
-                
-                bool isUI = (parts.size() == 5 && parts[4] == "1");
+                bool isUI = (parts[4] == "1");
+                std::string userId = parts[5]; 
 
-                Order newOrder(id, qty, priceRaw, isBuy);
+                // Instantiate with the userId correctly passed from the Node gateway
+                Order newOrder(id, qty, priceRaw, isBuy, userId);
 
                 kairon.placeOrder(symbol, newOrder, isUI);
 
@@ -124,20 +123,9 @@ int main()
 
     Sleep(1000);
 
+    // Keep main thread running
     while (true)
     {
-        // MUTED: Stop wiping the screen so we can read the logs!
-        // system("cls");
-        
-        // MUTED: Stop printing the dashboard loop so the UI logs aren't swallowed
-        /*
-        std::cout << "=========================================" << std::endl;
-        std::cout << "       KAIRON ISOLATED STATE ENGINE      " << std::endl;
-        std::cout << "=========================================" << std::endl;
-        for (const auto &sym : ACTIVE_ASSETS) { ... }
-        std::cout << "=========================================" << std::endl;
-        */
-
         Sleep(1500);
     }
 

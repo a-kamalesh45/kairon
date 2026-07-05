@@ -54,36 +54,44 @@ async function startServer() {
         }
 
         // Listen to C++ Engine and Broadcast to Next.js
+        // Listen to C++ Engine and Broadcast to Next.js
         await redisSubscriber.subscribe('trade-updates', async (message) => {
             let tradeData = null;
 
             try {
                 tradeData = JSON.parse(message);
 
-                const parsedTimestamp = tradeData.timestamp ? new Date(tradeData.timestamp) : null;
-                const timestamp = parsedTimestamp && !Number.isNaN(parsedTimestamp.getTime())
-                    ? parsedTimestamp
-                    : new Date();
+                // 🚨 THE FIX: Do not try to save "Sys" messages to the Database!
+                if (tradeData.type === 'sys') {
+                    console.log(`\x1b[41m\x1b[37m[GATEWAY] System Alert: ${tradeData.msg}\x1b[0m`);
+                } else {
+                    const parsedTimestamp = tradeData.timestamp ? new Date(tradeData.timestamp) : null;
+                    const timestamp = parsedTimestamp && !Number.isNaN(parsedTimestamp.getTime())
+                        ? parsedTimestamp
+                        : new Date();
 
-                await Trade.create({
-                    orderId: String(tradeData.orderId || tradeData.id || `${tradeData.symbol}-${Date.now()}`),
-                    user: tradeData.user || undefined,
-                    symbol: String(tradeData.symbol || '').toUpperCase(),
-                    price: Number(Number(tradeData.price).toFixed(8)),
-                    qty: Number(Number(tradeData.qty).toFixed(8)),
-                    side: tradeData.side,
-                    timestamp
-                });
+                    // Only save actual executions to DB
+                    await Trade.create({
+                        orderId: String(tradeData.orderId || tradeData.id || `${tradeData.symbol}-${Date.now()}`),
+                        user: tradeData.user || undefined,
+                        symbol: String(tradeData.symbol || '').toUpperCase(),
+                        price: Number(Number(tradeData.price).toFixed(8)),
+                        qty: Number(Number(tradeData.qty).toFixed(8)),
+                        side: tradeData.side,
+                        timestamp
+                    });
+                }
             } catch (error) {
                 console.error('\x1b[31m[TRADE ARCHIVE ERROR]\x1b[0m', error);
             }
 
+            // Always broadcast to WebSockets, even if it's a sys message
             if (tradeData) {
                 broadcast(tradeData);
             }
         });
         console.log('\x1b[36m[WEBSOCKET]\x1b[0m Subscribed to C++ Engine feeds');
-
+        
     } catch (err) {
         console.error('\x1b[31m[FATAL BOOT ERROR]\x1b[0m', err);
         process.exit(1);

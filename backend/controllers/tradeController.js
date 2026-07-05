@@ -14,9 +14,11 @@ exports.placeOrder = async (req, res) => {
         const normalizedSymbol = String(symbol || '').toUpperCase();
         const normalizedSide = String(side || '').toLowerCase();
         const normalizedQty = toSafeNumber(qty);
-        
+
         // 1. Identity Verification (From JWT Middleware)
-        const user = req.user; 
+        const user = req.user;
+
+
 
         if (!normalizedSymbol || !['buy', 'sell'].includes(normalizedSide) || !Number.isFinite(normalizedQty) || normalizedQty <= 0) {
             return res.status(400).json({ success: false, error: 'Invalid order payload' });
@@ -67,19 +69,21 @@ exports.placeOrder = async (req, res) => {
         if (!lockedUser) {
             return res.status(400).json({ success: false, error: 'Insufficient Funds' });
         }
-        
+
         // 2. Format for C++ Engine
         const enginePrice = Math.floor(normalizedPrice * 10000);
         const engineQty = Math.floor(normalizedQty * 10000);
         const isBuy = normalizedSide === 'buy' ? '1' : '0';
 
-        const orderId = String(Date.now()); 
-        // Note: We will eventually add User ID to this payload so C++ knows who traded
-        const payload = `${orderId},${engineQty},${enginePrice},${isBuy}`;
-        
-        // 3. Push to Redis (req.redisPublisher is injected via server.js)
+        const orderId = String(Date.now());
+
+        const userId = req.user._id.toString();
+
+        // 🚀 THE FIX: Append the userId to the payload
+        // Format: OrderID, Qty, Price, Side, IsUI, UserID
+        const payload = `${orderId},${engineQty},${enginePrice},${isBuy},1,${userId}`;
+
         await req.redisPublisher.rPush(`orders:${normalizedSymbol}`, payload);
-        
         const logColor = normalizedSide === 'buy' ? '\x1b[32m' : '\x1b[31m';
         console.log(`${logColor}🚨 [ORDER RECEIVED] User ${user.email} -> ${normalizedSide.toUpperCase()} ${normalizedQty} ${normalizedSymbol} @ $${normalizedPrice}\x1b[0m`);
 
@@ -88,5 +92,21 @@ exports.placeOrder = async (req, res) => {
     } catch (error) {
         console.error("\x1b[31m[TRADE ERROR]\x1b[0m", error);
         res.status(500).json({ success: false, error: 'Server Error' });
+    }
+};
+
+exports.resyncReality = async (req, res) => {
+    try {
+        const { symbol } = req.body;
+        if (!symbol) return res.status(400).json({ success: false, error: 'Symbol required' });
+
+        const normalizedSymbol = String(symbol).toUpperCase();
+        console.log(`\x1b[41m\x1b[37m🚨 [UI COMMAND] FORCING REALITY RESYNC ON ${normalizedSymbol}\x1b[0m`);
+
+        await req.redisPublisher.rPush(`orders:${normalizedSymbol}`, "RESYNC");
+        res.status(200).json({ success: true, message: 'Resync triggered' });
+    } catch (err) {
+        console.error("[RESYNC ERROR]", err);
+        res.status(500).json({ success: false, error: "Failed to trigger resync" });
     }
 };

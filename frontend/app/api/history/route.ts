@@ -2,8 +2,11 @@ import { NextRequest, NextResponse } from 'next/server'
 
 export async function GET(req: NextRequest) {
   const symbol = req.nextUrl.searchParams.get('symbol') ?? 'BTC'
+  // 🚀 THE FIX: Dynamically fetch the requested interval, default to 1m
+  const interval = req.nextUrl.searchParams.get('interval') ?? '1m' 
+  
   const pair = `${symbol.toUpperCase()}USDT`
-  const url = `https://api.binance.com/api/v3/klines?symbol=${pair}&interval=1h&limit=500`
+  const url = `https://api.binance.com/api/v3/klines?symbol=${pair}&interval=${interval}&limit=500`
 
   try {
     const res = await fetch(url, {

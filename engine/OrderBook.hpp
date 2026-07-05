@@ -13,12 +13,11 @@ struct Order
     ll quantity; 
     ll price;     
     bool type; 
+    std::string userId; // Finalized
 
-    // Constructor accepts DOUBLE, but stores LONG LONG for precision
-    Order(ll i, ll q, double rawPrice, bool t) 
-        : id(i), quantity(q), type(t) 
+    Order(ll i, ll q, double rawPrice, bool t, const std::string &uid) 
+        : id(i), quantity(q), type(t), userId(uid) 
     {
-        // Example: $50.125 -> 501250 (Scaled by 10000)
         price = (ll)(rawPrice * 10000); 
     }
 };
@@ -47,10 +46,9 @@ private:
     void executeSyntheticUIOrder(Order &order, std::string symbol); // Local market impact math
 
 public:
-    // Upgraded to accept the isUI flag
     void addOrder(Order order, std::string symbol, bool isUI);
-    
     Ticker getTicker();
+    std::string getDepthSnapshot(std::string symbol);
     
     std::vector<std::string> flushTrades() {
         std::vector<std::string> temp = pendingTrades;
@@ -58,7 +56,6 @@ public:
         return temp;
     }
 
-    // === NEW: THE KILL-SWITCH ===
     void resyncToWorld() {
         priceOffset = 0;
         isDiverged = false;

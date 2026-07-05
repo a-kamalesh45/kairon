@@ -390,7 +390,7 @@ export default function TradeTerminal() {
                 return
             }
 
-            const res = await fetch('http://localhost:3001/order', {
+            const res = await fetch('http://localhost:3001/api/trade/order', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
@@ -422,7 +422,7 @@ export default function TradeTerminal() {
 
     const handleResync = async () => {
         try {
-            await fetch('http://localhost:3001/resync', {
+            await fetch('http://localhost:3001/api/trade/resync', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ symbol: selectedCrypto.symbol })

@@ -1,6 +1,6 @@
 import { useEffect, useRef } from 'react'
 import { Time, ISeriesApi } from 'lightweight-charts'
-import { Trade, OrderBookItem } from '../types'
+import { Trade } from '../types'
 
 interface UseWebSocketProps {
     candleSeriesRef: React.MutableRefObject<ISeriesApi<"Candlestick"> | null>
@@ -36,55 +36,66 @@ export function useWebSocket({
         ws.current.onmessage = (event) => {
             try {
                 const data = JSON.parse(event.data)
-                if (data.type === 'trade') {
-                    const { price, qty, side, time: timeStr } = data
-                    const numPrice = parseFloat(price)
-                    const numQty = parseFloat(qty)
+                
+                // We handle both normal execution JSONs and standard ticks
+                if (data.type === 'trade' || (data.price && data.timestamp)) {
+                    const numPrice = Number(data.price)
+                    const numQty = Number(data.qty)
+                    
+                    // 1. Normalize timestamp strictly to Unix Seconds
+                    const unixSeconds = data.timestamp > 10000000000 
+                        ? Math.floor(data.timestamp / 1000) 
+                        : data.timestamp
+                    
+                    // 2. Lock the time to the 60-second floor (perfect Binance 1m match)
+                    const candleTime = (Math.floor(unixSeconds / 60) * 60) as Time
 
-                    onPriceUpdate(numPrice, currentPriceRef.current)
                     currentPriceRef.current = numPrice
-
-                    const nowSeconds = Math.floor(Date.now() / 1000)
-                    const candleTime = Math.floor(nowSeconds / 60) * 60
+                    onPriceUpdate(numPrice, numPrice)
 
                     if (!currentCandle.current) return
 
-                    if ((candleTime as Time) > (currentCandle.current.time as Time)) {
+                    // 3. True OHLC Aggregation Logic
+                    if (candleTime > currentCandle.current.time) {
+                        // Start a brand new 1m candle
                         const prevClose = currentCandle.current.close
                         currentCandle.current = {
-                            time: candleTime as Time,
+                            time: candleTime,
                             open: prevClose,
                             high: Math.max(prevClose, numPrice),
                             low: Math.min(prevClose, numPrice),
                             close: numPrice
                         }
-                    } else {
+                    } else if (candleTime === currentCandle.current.time) {
+                        // Mutate the currently forming 1m candle
                         currentCandle.current.close = numPrice
                         currentCandle.current.high = Math.max(currentCandle.current.high, numPrice)
                         currentCandle.current.low = Math.min(currentCandle.current.low, numPrice)
                     }
 
+                    // 4. Update the chart smoothly
                     candleSeriesRef.current?.update(currentCandle.current)
 
+                    // 5. Fire side-effects
                     onTrade({
-                        id: Math.random().toString(36).substr(2, 5),
+                        id: data.id || Math.random().toString(36).substr(2, 5),
                         price: numPrice,
                         qty: numQty,
-                        side,
-                        time: timeStr
+                        side: data.side,
+                        time: new Date(unixSeconds * 1000).toLocaleTimeString()
                     })
 
                     onOrderBook(numPrice)
                 }
             } catch (e) {
-                console.error(e)
+                console.error("WebSocket Parsing Error:", e)
             }
         }
 
         return () => {
             ws.current?.close()
         }
-    }, [])
+    }, [candleSeriesRef, currentCandle, currentPriceRef, onTrade, onOrderBook, onPriceUpdate])
 
     return { ws, connectionStatus }
 }

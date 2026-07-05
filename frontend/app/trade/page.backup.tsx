@@ -286,7 +286,7 @@ export default function TradeTerminal() {
     const placeOrder = async (side: "buy" | "sell") => {
         if (!orderQty) return alert("Enter Quantity")
         try {
-            await fetch('http://localhost:3001/order', {
+            await fetch('http://localhost:3001/api/trade/order', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
