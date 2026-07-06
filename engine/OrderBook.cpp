@@ -73,6 +73,7 @@ void OrderBook::executeSyntheticUIOrder(Order &order, string symbol)
          << endl;
 
     stringstream json;
+    json << std::fixed << std::setprecision(4);
     json << "{\"type\":\"trade\","
          << "\"symbol\":\"" << symbol << "\","
          << "\"price\":" << (executedPrice / 10000.0) << ","
@@ -104,6 +105,7 @@ void OrderBook::matchOrders(Order &incomingOrder, string symbol)
             lastTradedPrice = bestPrice;
 
             stringstream json;
+            json << std::fixed << std::setprecision(4);
             json << "{\"type\":\"trade\","
                  << "\"symbol\":\"" << symbol << "\","
                  << "\"price\":" << (bestPrice / 10000.0) << ","
@@ -140,6 +142,7 @@ void OrderBook::matchOrders(Order &incomingOrder, string symbol)
             lastTradedPrice = bestPrice;
 
             stringstream json;
+            json << std::fixed << std::setprecision(4);
             json << "{\"type\":\"trade\","
                  << "\"symbol\":\"" << symbol << "\","
                  << "\"price\":" << (bestPrice / 10000.0) << ","

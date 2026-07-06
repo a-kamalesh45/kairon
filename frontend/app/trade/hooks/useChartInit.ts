@@ -120,10 +120,13 @@ export function useChartInit({ theme, mounted, selectedCrypto, onPriceUpdate }: 
 
                             const lastCandle = lcData[lcData.length - 1]
                             currentCandle.current = {
-                                time: (Math.floor(Date.now() / 1000 / 60) * 60) as Time,
-                                open: lastCandle.close,
-                                high: lastCandle.close,
-                                low: lastCandle.close,
+                                // 🚀 THE FIX: Use Binance's exact server time, completely ignoring Date.now()
+                                time: lastCandle.time,
+
+                                // 🚀 BONUS FIX: Use the actual historical OHLC values, not just flat closes
+                                open: lastCandle.open,
+                                high: lastCandle.high,
+                                low: lastCandle.low,
                                 close: lastCandle.close
                             }
                             onPriceUpdate(lastCandle.close, lastCandle.open)

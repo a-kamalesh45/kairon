@@ -9,6 +9,11 @@ interface OrderPanelProps {
     orderQty: string
     orderPrice: string
     orderType: 'limit' | 'market'
+    // 🚀 THE FIX: Require real balances from the parent component
+    availableBalance: number
+    portfolioValue: number
+    unrealizedPnl: number
+    todayPnl: number
     setOrderQty: (qty: string) => void
     setOrderPrice: (price: string) => void
     setOrderType: (type: 'limit' | 'market') => void
@@ -21,15 +26,26 @@ export function OrderPanel({
     orderQty,
     orderPrice,
     orderType,
+    availableBalance,
+    portfolioValue,
+    unrealizedPnl,
+    todayPnl,
     setOrderQty,
     setOrderPrice,
     setOrderType,
     placeOrder
 }: OrderPanelProps) {
+    
+    // Helper to format currency dynamically
+    const formatCurrency = (val: number) => 
+        new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(val);
+
     return (
         <div className="h-56 shrink-0 border-t border-white/10 p-5 bg-white/5">
             <div className="h-full flex gap-8">
+                {/* ... (Keep the left side of the panel with the inputs exactly the same) ... */}
                 <div className="w-80 space-y-4">
+                    {/* (Your existing input HTML goes here) */}
                     <div className="flex items-center justify-between">
                         <h3 className="font-bold font-mono flex items-center gap-2 text-white uppercase tracking-wider text-sm">
                             <Zap className="w-4 h-4 text-[#00E5FF]" />
@@ -38,15 +54,13 @@ export function OrderPanel({
                         <div className="flex items-center gap-1">
                             <button
                                 onClick={() => setOrderType('limit')}
-                                className={`px-3 py-1 text-xs font-medium font-mono uppercase tracking-wider transition-all duration-150 border ${orderType === 'limit' ? 'border-[#00E5FF] text-[#00E5FF]' : 'border-white/20 text-gray-500'
-                                    }`}
+                                className={`px-3 py-1 text-xs font-medium font-mono uppercase tracking-wider transition-all duration-150 border ${orderType === 'limit' ? 'border-[#00E5FF] text-[#00E5FF]' : 'border-white/20 text-gray-500'}`}
                             >
                                 LIMIT
                             </button>
                             <button
                                 onClick={() => setOrderType('market')}
-                                className={`px-3 py-1 text-xs font-medium font-mono uppercase tracking-wider transition-all duration-150 border ${orderType === 'market' ? 'border-[#00E5FF] text-[#00E5FF]' : 'border-white/20 text-gray-500'
-                                    }`}
+                                className={`px-3 py-1 text-xs font-medium font-mono uppercase tracking-wider transition-all duration-150 border ${orderType === 'market' ? 'border-[#00E5FF] text-[#00E5FF]' : 'border-white/20 text-gray-500'}`}
                             >
                                 MARKET
                             </button>
@@ -103,10 +117,21 @@ export function OrderPanel({
                 </div>
 
                 <div className="flex-1 grid grid-cols-4 gap-6 pl-8 border-l border-white/10">
-                    <PortfolioStat label="AVAILABLE BALANCE" value="$42,500.00" icon={<Wallet className="w-4 h-4" />} />
-                    <PortfolioStat label="PORTFOLIO VALUE" value="$142,059.20" icon={<BarChart3 className="w-4 h-4" />} showSparkline />
-                    <PortfolioStat label="UNREALIZED P&L" value="+$1,203.50" color="text-[#00E5FF]" icon={<TrendingUp className="w-4 h-4" />} />
-                    <PortfolioStat label="TODAY'S P&L" value="+$458.32" color="text-[#00E5FF]" icon={<Activity className="w-4 h-4" />} />
+                    {/* 🚀 THE FIX: Render the real dynamic data */}
+                    <PortfolioStat label="AVAILABLE BALANCE" value={formatCurrency(availableBalance)} icon={<Wallet className="w-4 h-4" />} />
+                    <PortfolioStat label="PORTFOLIO VALUE" value={formatCurrency(portfolioValue)} icon={<BarChart3 className="w-4 h-4" />} showSparkline />
+                    <PortfolioStat 
+                        label="UNREALIZED P&L" 
+                        value={`${unrealizedPnl >= 0 ? '+' : ''}${formatCurrency(unrealizedPnl)}`} 
+                        color={unrealizedPnl >= 0 ? "text-[#00E5FF]" : "text-[#FF006E]"} 
+                        icon={<TrendingUp className="w-4 h-4" />} 
+                    />
+                    <PortfolioStat 
+                        label="TODAY'S P&L" 
+                        value={`${todayPnl >= 0 ? '+' : ''}${formatCurrency(todayPnl)}`} 
+                        color={todayPnl >= 0 ? "text-[#00E5FF]" : "text-[#FF006E]"} 
+                        icon={<Activity className="w-4 h-4" />} 
+                    />
                 </div>
             </div>
         </div>

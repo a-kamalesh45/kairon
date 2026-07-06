@@ -2,9 +2,10 @@
 #include <map>
 #include <string>
 #include <vector>
+#include <iomanip>
 #include <sstream>
-#include "SimpleRedis.hpp"
 #include <windows.h>
+#include "SimpleRedis.hpp"
 #include "OrderBook.hpp"
 
 std::vector<std::string> ACTIVE_ASSETS = {"BTC", "ETH", "BNB", "SOL", "DOGE", "LINK", "XRP", "LTC"};
@@ -38,6 +39,7 @@ public:
 Exchange kairon;
 bool running = true;
 
+// Reverted to Windows Native Threading to support your local MinGW compiler
 DWORD WINAPI redisConsumerLoop(LPVOID lpParam)
 {
     std::string *symPtr = reinterpret_cast<std::string *>(lpParam);
@@ -53,12 +55,13 @@ DWORD WINAPI redisConsumerLoop(LPVOID lpParam)
 
     std::cout << "\033[32m[THREAD-BOOT] Engine core online for " << symbol << "\033[0m" << std::endl;
 
+    int localTradeCounter = 0;
+
     while (running)
     {
         std::string payload = redis.consume("orders:" + symbol);
         if (payload.empty()) continue;
 
-        // === THE KILL-SWITCH INTERCEPT ===
         if (payload == "RESYNC")
         {
             std::cout << "\n\033[41m\033[37m 🚨 REALITY RESYNC TRIGGERED FOR " << symbol << " 🚨 \033[0m\n" << std::endl;
@@ -73,25 +76,48 @@ DWORD WINAPI redisConsumerLoop(LPVOID lpParam)
             std::string item;
             while (std::getline(ss, item, ',')) parts.push_back(item);
 
-            // Payload: ID (0), Qty (1), Price (2), Side (3), IsUI (4), UserID (5)
             if (parts.size() >= 6)
             {
-                long long id = std::stoll(parts[0]);
+                long long id = std::stoll(parts[0]); // Binance Timestamp (ms)
                 long long qty = std::stoll(parts[1]);
                 double priceRaw = std::stod(parts[2]) / 10000.0;
                 bool isBuy = (parts[3] == "1");
                 bool isUI = (parts[4] == "1");
                 std::string userId = parts[5]; 
 
-                // Instantiate with the userId correctly passed from the Node gateway
                 Order newOrder(id, qty, priceRaw, isBuy, userId);
-
                 kairon.placeOrder(symbol, newOrder, isUI);
 
+                // 1. Broadcast Local Executions (If your UI order matched)
                 std::vector<std::string> trades = kairon.getBroadcasts(symbol);
                 for (const auto &json : trades)
                 {
                     redis.publish("trade-updates", json);
+                }
+
+                // 2. 🚀 THE FIX: Forward the Global Binance Tick!
+                // If it came from Binance, forward the raw tick to unfreeze the Next.js UI
+                if (!isUI) 
+                {
+                    std::stringstream tickJson;
+                    tickJson << std::fixed << std::setprecision(4);
+                    tickJson << "{\"type\":\"trade\","
+                             << "\"symbol\":\"" << symbol << "\","
+                             << "\"price\":" << priceRaw << ","
+                             << "\"qty\":" << (qty / 10000.0) << ","
+                             << "\"side\":\"" << (isBuy ? "buy" : "sell") << "\","
+                             << "\"timestamp\":" << id << ","
+                             << "\"time\":\"" << id << "\","
+                             << "\"user\":\"BINANCE\"}";
+                    
+                    redis.publish("trade-updates", tickJson.str());
+                }
+
+                // 3. Broadcast Real Order Book Depth
+                if (++localTradeCounter % 50 == 0 || isUI) 
+                {
+                    std::string depthJson = kairon.orderBooks[symbol].getDepthSnapshot(symbol);
+                    redis.publish("trade-updates", depthJson);
                 }
             }
         }
@@ -100,6 +126,7 @@ DWORD WINAPI redisConsumerLoop(LPVOID lpParam)
             // Ignore malformed data silently
         }
     }
+    
     delete symPtr;
     return 0;
 }
@@ -113,6 +140,7 @@ int main()
         kairon.orderBooks[sym] = OrderBook();
     }
 
+    // Windows native thread creation
     std::vector<HANDLE> threads;
     for (size_t i = 0; i < ACTIVE_ASSETS.size(); i++)
     {
@@ -122,8 +150,8 @@ int main()
     }
 
     Sleep(1000);
+    std::cout << "=== ENGINE RUNNING: NATIVE OS WORKER THREADS DEPLOYED ===" << std::endl;
 
-    // Keep main thread running
     while (true)
     {
         Sleep(1500);

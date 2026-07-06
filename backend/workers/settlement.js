@@ -1,3 +1,4 @@
+require('dotenv').config();
 const mongoose = require('mongoose');
 const { createClient } = require('redis');
 const User = require('../models/User'); // Path to your User model

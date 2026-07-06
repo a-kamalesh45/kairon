@@ -40,10 +40,16 @@ async function startBot() {
 
             const enginePrice = Math.floor(price * 10000);
             const engineQty = Math.floor(qty * 10000);
-            const payload = `${tradeData.E},${engineQty},${enginePrice},${side}`;
             
-            // PUSH EVERYTHING TO REDIS (No more BTC hardcode!)
+            // 🚀 THE FIX: 6-Part Payload (ID, Qty, Price, Side, IsUI, UserID)
+            const payload = `${tradeData.E},${engineQty},${enginePrice},${side},0,BINANCE`;
+            
+            // PUSH EVERYTHING TO REDIS
             await publisher.rPush(`orders:${symbol}`, payload);
+
+            // 🚀 ARCHITECTURE UPGRADE: Prevent Redis OOM Memory Crash
+            // Keep only the last 5,000 trades in the queue per asset
+            await publisher.lTrim(`orders:${symbol}`, -5000, -1);
 
             // HEARTBEAT LOG (Prints every 100th trade)
             tradeCounter++;

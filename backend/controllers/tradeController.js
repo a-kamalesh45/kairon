@@ -75,15 +75,18 @@ exports.placeOrder = async (req, res) => {
         const engineQty = Math.floor(normalizedQty * 10000);
         const isBuy = normalizedSide === 'buy' ? '1' : '0';
 
-        const orderId = String(Date.now());
 
         const userId = req.user._id.toString();
 
-        // 🚀 THE FIX: Append the userId to the payload
-        // Format: OrderID, Qty, Price, Side, IsUI, UserID
-        const payload = `${orderId},${engineQty},${enginePrice},${isBuy},1,${userId}`;
-
+        const orderId = String(Date.now()); 
+        
+        // 🚀 THE FIX: 6-Part Payload (ID, Qty, Price, Side, IsUI, UserID)
+        // Set IsUI = 1 so the C++ engine knows to apply localized market impact
+        const payload = `${orderId},${engineQty},${enginePrice},${isBuy},1,${user._id.toString()}`;
+        
+        // 3. Push to Redis (req.redisPublisher is injected via server.js)
         await req.redisPublisher.rPush(`orders:${normalizedSymbol}`, payload);
+
         const logColor = normalizedSide === 'buy' ? '\x1b[32m' : '\x1b[31m';
         console.log(`${logColor}🚨 [ORDER RECEIVED] User ${user.email} -> ${normalizedSide.toUpperCase()} ${normalizedQty} ${normalizedSymbol} @ $${normalizedPrice}\x1b[0m`);
 
